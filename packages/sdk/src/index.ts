@@ -76,9 +76,36 @@ async function privySendTransaction(config: PrivyWalletConfig, params: {
     }),
   });
 
+  // If sponsorship not enabled, retry without it
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Privy RPC failed (${res.status}): ${err}`);
+    const errText = await res.text();
+    if (errText.includes('Gas sponsorship is not enabled')) {
+      const retryRes = await fetch(`https://api.privy.io/v1/wallets/${config.walletId}/rpc`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${basicAuth}`,
+          'privy-app-id': config.privyAppId,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          method: 'eth_sendTransaction',
+          caip2: `eip155:${params.chainId}`,
+          params: {
+            transaction: {
+              to: params.to,
+              data: params.data,
+            },
+          },
+        }),
+      });
+      if (!retryRes.ok) {
+        const retryErr = await retryRes.text();
+        throw new Error(`Privy RPC failed (${retryRes.status}): ${retryErr}`);
+      }
+      const result = await retryRes.json() as any;
+      return result.data?.hash ?? result.hash ?? result.result;
+    }
+    throw new Error(`Privy RPC failed (${res.status}): ${errText}`);
   }
 
   const result = await res.json() as any;
