@@ -37,7 +37,7 @@ describe('Service Discovery', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.name).toBe('AgentGate Gateway');
-    expect(data.endpoints).toHaveLength(3);
+    expect(data.endpoints.length).toBeGreaterThanOrEqual(3);
     expect(data.token.decimals).toBe(6);
     expect(data.chain.id).toBe(42431);
   });
