@@ -6,7 +6,7 @@ import { STABLECOINS } from '@tempo-agentgate/core';
 import { parse as parseHTML } from 'node-html-parser';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { createPublicClient, http, formatUnits } from 'viem';
+import { createPublicClient, http, formatUnits, parseAbiItem } from 'viem';
 import { tempoTestnet } from '@tempo-agentgate/core';
 import type { Address, Hex } from 'viem';
 
@@ -104,6 +104,52 @@ function saveStats() {
 }
 
 const stats = loadStats();
+
+// ─── On-Chain Stats Bootstrap ────────────────────────────────────
+async function loadOnChainStats() {
+  try {
+    const client = createPublicClient({ chain: tempoTestnet, transport: http() });
+    const latest = await client.getBlockNumber();
+    const fromBlock = latest > 99999n ? latest - 99999n : 0n;
+
+    const logs = await client.getLogs({
+      address: STABLECOINS.pathUSD.address,
+      event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 value)'),
+      args: { to: PROVIDER_ADDRESS },
+      fromBlock,
+      toBlock: latest,
+    });
+
+    // Only bootstrap if we have no paid requests tracked yet
+    if (stats.paidRequests === 0 && logs.length > 0) {
+      let totalRev = BigInt(0);
+      const txs: TransactionLog[] = [];
+
+      for (const log of logs) {
+        const val = log.args.value as bigint;
+        totalRev += val;
+        txs.push({
+          txHash: log.transactionHash!,
+          from: (log.args.from as string) || 'unknown',
+          amount: formatUnits(val, 6),
+          endpoint: 'on-chain',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      stats.paidRequests = logs.length;
+      stats.totalRevenue = totalRev;
+      stats.recentTransactions = txs.slice(-50).reverse();
+      saveStats();
+      console.log(`📊 Bootstrapped ${logs.length} transactions from chain (${formatUnits(totalRev, 6)} pathUSD)`);
+    }
+  } catch (e) {
+    console.error('Failed to bootstrap on-chain stats:', e);
+  }
+}
+
+// Fire and forget — don't block startup
+loadOnChainStats();
 
 // ─── Passkey Credential Store (In-Memory) ────────────────────────
 interface PasskeyCredential {
