@@ -1062,12 +1062,12 @@ app.get('/dashboard', async (c) => {
     .slice(0, 20)
     .map(
       (tx) => `
-      <tr class="border-b border-gray-700">
-        <td class="px-4 py-3 font-mono text-xs">${tx.txHash.slice(0, 10)}…${tx.txHash.slice(-6)}</td>
-        <td class="px-4 py-3 font-mono text-xs">${tx.from.slice(0, 10)}…</td>
-        <td class="px-4 py-3 text-green-400">${tx.amount} pathUSD</td>
-        <td class="px-4 py-3"><span class="bg-blue-900 text-blue-300 px-2 py-1 rounded text-xs">${tx.endpoint}</span></td>
-        <td class="px-4 py-3 text-gray-400 text-xs">${new Date(tx.timestamp).toLocaleTimeString()}</td>
+      <tr>
+        <td class="mono" style="font-size:12px;color:var(--text-2);">${tx.txHash.slice(0, 10)}…${tx.txHash.slice(-6)}</td>
+        <td class="mono" style="font-size:12px;color:var(--text-2);">${tx.from.slice(0, 10)}…</td>
+        <td style="color:var(--accent);font-weight:500;">${tx.amount} pathUSD</td>
+        <td><span class="endpoint-tag">${tx.endpoint}</span></td>
+        <td style="color:var(--text-3);font-size:12px;">${new Date(tx.timestamp).toLocaleTimeString()}</td>
       </tr>`,
     )
     .join('');
@@ -1077,160 +1077,284 @@ app.get('/dashboard', async (c) => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AgentGate Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Dashboard — AgentGate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050505; --surface: #0c0c0c; --border: #1a1a1a;
+      --text: #e8e8e8; --text-2: #737373; --text-3: #454545;
+      --accent: #c8ff00; --accent-dim: #3d4d00;
+      --red: #ff4040; --green: #00e87b;
+    }
+    body {
+      font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text);
+      min-height: 100vh; -webkit-font-smoothing: antialiased;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -20%, rgba(200,255,0,0.03), transparent),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(200,255,0,0.02), transparent);
+    }
+    .mono { font-family: 'DM Mono', monospace; }
+    .serif { font-family: 'Instrument Serif', serif; }
+
+    /* Grain */
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: 0.3;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; position: relative; z-index: 1; }
+
+    /* Nav */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 0; margin-bottom: 48px; border-bottom: 1px solid var(--border);
+    }
+    nav a { color: var(--text-2); text-decoration: none; font-size: 14px; transition: color 0.2s; }
+    nav a:hover { color: var(--text); }
+    .nav-brand { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--text); letter-spacing: -0.5px; }
+    .nav-links { display: flex; gap: 24px; align-items: center; }
+
+    /* Header */
+    .dash-header { margin-bottom: 48px; }
+    .dash-header h1 { font-family: 'Instrument Serif', serif; font-size: clamp(32px, 5vw, 48px); font-weight: 400; line-height: 1.1; margin-bottom: 8px; }
+    .dash-header h1 span { color: var(--accent); }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(200,255,0,0.08); border: 1px solid rgba(200,255,0,0.2);
+      padding: 4px 12px; border-radius: 100px; font-size: 12px; color: var(--accent);
+      font-family: 'DM Mono', monospace;
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* Stat cards */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 48px; }
+    @media (max-width: 768px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px;
+      transition: border-color 0.3s;
+    }
+    .stat-card:hover { border-color: rgba(200,255,0,0.15); }
+    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-3); margin-bottom: 8px; font-family: 'DM Mono', monospace; }
+    .stat-value { font-size: 28px; font-weight: 500; line-height: 1.2; }
+    .stat-sub { font-size: 12px; color: var(--text-3); margin-top: 4px; font-family: 'DM Mono', monospace; }
+    .stat-accent { color: var(--accent); }
+
+    /* Section */
+    .section { margin-bottom: 48px; }
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 16px; margin-bottom: 0; border-bottom: 1px solid var(--border);
+    }
+    .section-title { font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--text-3); }
+    .section-action { font-size: 13px; color: var(--accent); text-decoration: none; font-family: 'DM Mono', monospace; }
+    .section-action:hover { text-decoration: underline; }
+
+    /* Endpoints */
+    .endpoint-row {
+      display: flex; align-items: center; justify-content: space-between; padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .endpoint-row:last-child { border-bottom: none; }
+    .endpoint-method {
+      font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--accent); background: rgba(200,255,0,0.08); border: 1px solid rgba(200,255,0,0.15);
+      padding: 2px 8px; border-radius: 4px; margin-right: 12px;
+    }
+    .endpoint-path { font-family: 'DM Mono', monospace; font-size: 14px; }
+    .endpoint-desc { color: var(--text-2); font-size: 13px; margin-left: 16px; }
+    .endpoint-price { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent); white-space: nowrap; }
+    .endpoint-tag {
+      font-family: 'DM Mono', monospace; font-size: 10px;
+      background: rgba(200,255,0,0.06); border: 1px solid var(--border);
+      padding: 2px 8px; border-radius: 4px; color: var(--text-2);
+    }
+
+    /* Privy section */
+    .privy-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border-radius: 12px; overflow: hidden; margin-top: 0; }
+    @media (max-width: 640px) { .privy-grid { grid-template-columns: 1fr; } }
+    .privy-cell { background: var(--surface); padding: 24px; text-align: center; }
+    .privy-val { font-size: 18px; font-weight: 500; margin-bottom: 4px; }
+    .privy-label { font-size: 12px; color: var(--text-3); }
+
+    /* Providers */
+    .provider-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border); }
+    .provider-row:last-child { border-bottom: none; }
+    .provider-name { font-weight: 500; }
+    .provider-desc { color: var(--text-2); font-size: 13px; margin-left: 12px; }
+    .provider-cat {
+      font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase;
+      color: var(--text-3); border: 1px solid var(--border); padding: 2px 8px; border-radius: 4px; margin-left: 8px;
+    }
+
+    /* Transactions table */
+    table { width: 100%; border-collapse: collapse; }
+    th { font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-3); text-align: left; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    td { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    .empty-state { padding: 48px 0; text-align: center; color: var(--text-3); font-size: 14px; }
+
+    /* Footer */
+    .dash-footer { padding-top: 32px; border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+    .dash-footer a { color: var(--text-3); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+    .dash-footer a:hover { color: var(--accent); }
+  </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen">
-  <div class="max-w-6xl mx-auto px-6 py-10">
-    <div class="flex items-center gap-4 mb-8">
-      <div class="text-4xl">🚪</div>
-      <div>
-        <h1 class="text-3xl font-bold">AgentGate Dashboard</h1>
-        <p class="text-gray-400">HTTP 402 Payment Gateway for AI Agents on Tempo</p>
+<body>
+  <div class="container">
+    <nav>
+      <span class="nav-brand">agentgate</span>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/providers">Providers</a>
+        <a href="/.well-known/x-agentgate.json">Discovery</a>
+        <a href="https://github.com/ss251/agentgate" target="_blank">GitHub</a>
       </div>
-      <span class="ml-auto bg-green-900 text-green-300 px-3 py-1 rounded-full text-sm font-medium">● Online</span>
-    </div>
+    </nav>
 
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-      <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
-        <div class="text-gray-400 text-sm mb-1">Uptime</div>
-        <div class="text-2xl font-bold">${uptimeStr}</div>
-        <div class="text-gray-500 text-xs mt-1">v${VERSION}</div>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
-        <div class="text-gray-400 text-sm mb-1">Total Requests</div>
-        <div class="text-2xl font-bold">${stats.totalRequests}</div>
-        <div class="text-gray-500 text-xs mt-1">${stats.paidRequests} paid</div>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
-        <div class="text-gray-400 text-sm mb-1">Total Revenue</div>
-        <div class="text-2xl font-bold text-green-400">${formatUnits(stats.totalRevenue, 6)}</div>
-        <div class="text-gray-500 text-xs mt-1">pathUSD</div>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
-        <div class="text-gray-400 text-sm mb-1">Wallet Balance</div>
-        <div class="text-2xl font-bold">${balanceStr}</div>
-        <div class="text-gray-500 text-xs mt-1 font-mono">${PROVIDER_ADDRESS.slice(0, 10)}…</div>
+    <div class="dash-header">
+      <h1>System <span>Dashboard</span></h1>
+      <div style="display:flex;align-items:center;gap:16px;margin-top:12px;">
+        <span class="status-pill"><span class="status-dot"></span>online</span>
+        <span class="mono" style="font-size:12px;color:var(--text-3);">v${VERSION}</span>
       </div>
     </div>
 
-    <!-- Privy Wallet Infrastructure -->
-    <div class="bg-gray-900 rounded-xl border border-gray-800 mb-8">
-      <div class="px-5 py-4 border-b border-gray-800 flex items-center gap-2">
-        <span class="text-lg">🔐</span>
-        <h2 class="text-lg font-semibold">Powered by Privy</h2>
-        <span class="ml-auto bg-purple-900 text-purple-300 px-2 py-0.5 rounded text-xs">Server Wallets</span>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value">${uptimeStr}</div>
       </div>
-      <div class="p-5 grid md:grid-cols-3 gap-4">
-        <div class="text-center">
-          <div class="text-2xl font-bold text-purple-400">0-click</div>
-          <div class="text-gray-400 text-sm mt-1">Wallet creation for agents</div>
+      <div class="stat-card">
+        <div class="stat-label">Total Requests</div>
+        <div class="stat-value">${stats.totalRequests}</div>
+        <div class="stat-sub">${stats.paidRequests} paid</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Revenue</div>
+        <div class="stat-value stat-accent">${formatUnits(stats.totalRevenue, 6)}</div>
+        <div class="stat-sub">pathUSD</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Wallet Balance</div>
+        <div class="stat-value">${balanceStr}</div>
+        <div class="stat-sub">${PROVIDER_ADDRESS.slice(0, 10)}…</div>
+      </div>
+    </div>
+
+    <!-- Privy -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Wallet Infrastructure — Privy</span>
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);border:1px solid rgba(200,255,0,0.2);padding:2px 8px;border-radius:4px;">server wallets</span>
+      </div>
+      <div class="privy-grid">
+        <div class="privy-cell">
+          <div class="privy-val stat-accent">0-click</div>
+          <div class="privy-label">wallet creation</div>
         </div>
-        <div class="text-center">
-          <div class="text-2xl font-bold text-purple-400">No seed phrases</div>
-          <div class="text-gray-400 text-sm mt-1">Privy manages keys securely</div>
+        <div class="privy-cell">
+          <div class="privy-val">no seed phrases</div>
+          <div class="privy-label">Privy manages keys</div>
         </div>
-        <div class="text-center">
-          <div class="text-2xl font-bold text-purple-400">Fee sponsored</div>
-          <div class="text-gray-400 text-sm mt-1">Agents only need pathUSD</div>
+        <div class="privy-cell">
+          <div class="privy-val">fee sponsored</div>
+          <div class="privy-label">agents pay only pathUSD</div>
         </div>
       </div>
-      <div class="px-5 pb-4 text-sm text-gray-500">
-        POST <code class="text-gray-400">/api/wallets/create</code> → instant Privy server wallet · 
-        GET <code class="text-gray-400">/api/wallets/:id/balance</code> → on-chain balance check
+      <div style="padding:12px 0;font-size:12px;color:var(--text-3);font-family:'DM Mono',monospace;">
+        POST /api/wallets/create → instant wallet &nbsp;·&nbsp; GET /api/wallets/:id/balance → on-chain check
       </div>
     </div>
 
     <!-- Endpoints -->
-    <div class="bg-gray-900 rounded-xl border border-gray-800 mb-8">
-      <div class="px-5 py-4 border-b border-gray-800">
-        <h2 class="text-lg font-semibold">Available Endpoints</h2>
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Paid Endpoints</span>
       </div>
-      <div class="divide-y divide-gray-800">
-        <div class="px-5 py-4 flex items-center justify-between">
-          <div>
-            <span class="bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded text-xs font-mono mr-2">POST</span>
-            <span class="font-mono">/api/chat</span>
-            <span class="text-gray-400 ml-3 text-sm">LLM Chat — Groq llama-3.3-70b</span>
-            <span class="ml-2 bg-green-900 text-green-300 px-1.5 py-0.5 rounded text-xs">⭐ Featured</span>
-          </div>
-          <span class="text-green-400 font-mono">0.005 pathUSD</span>
+      <div class="endpoint-row">
+        <div style="display:flex;align-items:center;">
+          <span class="endpoint-method">post</span>
+          <span class="endpoint-path">/api/chat</span>
+          <span class="endpoint-desc">LLM Chat — Groq llama-3.3-70b</span>
         </div>
-        <div class="px-5 py-4 flex items-center justify-between">
-          <div>
-            <span class="bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded text-xs font-mono mr-2">POST</span>
-            <span class="font-mono">/api/execute</span>
-            <span class="text-gray-400 ml-3 text-sm">Run TypeScript, Python, or shell code</span>
-          </div>
-          <span class="text-green-400 font-mono">0.01 pathUSD</span>
+        <span class="endpoint-price">0.005 pathUSD</span>
+      </div>
+      <div class="endpoint-row">
+        <div style="display:flex;align-items:center;">
+          <span class="endpoint-method">post</span>
+          <span class="endpoint-path">/api/execute</span>
+          <span class="endpoint-desc">Run TypeScript, Python, or shell</span>
         </div>
-        <div class="px-5 py-4 flex items-center justify-between">
-          <div>
-            <span class="bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded text-xs font-mono mr-2">POST</span>
-            <span class="font-mono">/api/scrape</span>
-            <span class="text-gray-400 ml-3 text-sm">Fetch and extract content from URLs</span>
-          </div>
-          <span class="text-green-400 font-mono">0.005 pathUSD</span>
+        <span class="endpoint-price">0.01 pathUSD</span>
+      </div>
+      <div class="endpoint-row">
+        <div style="display:flex;align-items:center;">
+          <span class="endpoint-method">post</span>
+          <span class="endpoint-path">/api/scrape</span>
+          <span class="endpoint-desc">Fetch and extract content from URLs</span>
         </div>
-        <div class="px-5 py-4 flex items-center justify-between">
-          <div>
-            <span class="bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded text-xs font-mono mr-2">POST</span>
-            <span class="font-mono">/api/deploy</span>
-            <span class="text-gray-400 ml-3 text-sm">Deploy HTML and get a live URL</span>
-          </div>
-          <span class="text-green-400 font-mono">0.05 pathUSD</span>
+        <span class="endpoint-price">0.005 pathUSD</span>
+      </div>
+      <div class="endpoint-row">
+        <div style="display:flex;align-items:center;">
+          <span class="endpoint-method">post</span>
+          <span class="endpoint-path">/api/deploy</span>
+          <span class="endpoint-desc">Deploy HTML and get a live URL</span>
         </div>
+        <span class="endpoint-price">0.05 pathUSD</span>
       </div>
     </div>
 
-    <!-- Registered External Providers -->
-    <div class="bg-gray-900 rounded-xl border border-gray-800 mb-8">
-      <div class="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
-        <h2 class="text-lg font-semibold">🏪 External Providers</h2>
-        <a href="/providers" class="text-blue-400 hover:underline text-sm">Register yours →</a>
+    <!-- External Providers -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">External Providers</span>
+        <a href="/providers" class="section-action">register yours →</a>
       </div>
       ${registeredProviders.length === 0
-        ? '<div class="px-5 py-6 text-center text-gray-500">No external providers yet. <a href="/providers" class="text-blue-400 hover:underline">Register your API</a> to start earning.</div>'
-        : `<div class="divide-y divide-gray-800">${registeredProviders.slice(0, 5).map(p => `
-          <div class="px-5 py-3 flex items-center justify-between">
-            <div>
-              <span class="font-medium">${p.name}</span>
-              <span class="text-gray-400 ml-2 text-sm">${p.description}</span>
-              <span class="ml-2 bg-purple-900 text-purple-300 px-1.5 py-0.5 rounded text-xs">${p.category}</span>
+        ? '<div class="empty-state">No external providers yet. <a href="/providers" style="color:var(--accent);">Register your API</a> to start earning.</div>'
+        : registeredProviders.slice(0, 5).map(p => `
+          <div class="provider-row">
+            <div style="display:flex;align-items:center;">
+              <span class="provider-name">${p.name}</span>
+              <span class="provider-desc">${p.description}</span>
+              <span class="provider-cat">${p.category}</span>
             </div>
-            <span class="text-green-400 font-mono text-sm">${p.price} pathUSD</span>
-          </div>`).join('')}</div>`}
+            <span class="endpoint-price">${p.price} pathUSD</span>
+          </div>`).join('')}
     </div>
 
-    <!-- Recent Transactions -->
-    <div class="bg-gray-900 rounded-xl border border-gray-800">
-      <div class="px-5 py-4 border-b border-gray-800">
-        <h2 class="text-lg font-semibold">Recent Transactions</h2>
+    <!-- Transactions -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Recent Transactions</span>
       </div>
       ${stats.recentTransactions.length === 0
-        ? '<div class="px-5 py-8 text-center text-gray-500">No transactions yet. Waiting for agents to call paid endpoints…</div>'
-        : `<table class="w-full text-sm">
-        <thead class="text-gray-400 text-xs uppercase">
-          <tr class="border-b border-gray-800">
-            <th class="px-4 py-3 text-left">Tx Hash</th>
-            <th class="px-4 py-3 text-left">From</th>
-            <th class="px-4 py-3 text-left">Amount</th>
-            <th class="px-4 py-3 text-left">Endpoint</th>
-            <th class="px-4 py-3 text-left">Time</th>
+        ? '<div class="empty-state">No transactions yet. Waiting for agents to call paid endpoints…</div>'
+        : `<table>
+        <thead>
+          <tr>
+            <th>Tx Hash</th>
+            <th>From</th>
+            <th>Amount</th>
+            <th>Endpoint</th>
+            <th>Time</th>
           </tr>
         </thead>
         <tbody>${txRows}</tbody>
       </table>`}
     </div>
 
-    <div class="mt-8 text-center text-gray-600 text-sm">
-      <a href="/auth/passkey" class="text-purple-400 hover:underline">🔐 Sign in with Passkey</a> ·
-      AgentGate — Built on <a href="https://tempo.xyz" class="text-blue-400 hover:underline">Tempo</a> · 
-      Wallets by <a href="https://privy.io" class="text-purple-400 hover:underline">Privy</a> · 
-      <a href="/providers" class="text-blue-400 hover:underline">Provider Marketplace</a> ·
-      <a href="/.well-known/x-agentgate.json" class="text-blue-400 hover:underline">Discovery</a> ·
-      <a href="/api/health" class="text-blue-400 hover:underline">Health</a>
+    <div class="dash-footer">
+      <a href="/auth/passkey">Passkey Auth</a>
+      <a href="https://tempo.xyz" target="_blank">Tempo</a>
+      <a href="https://privy.io" target="_blank">Privy</a>
+      <a href="/providers">Marketplace</a>
+      <a href="/.well-known/x-agentgate.json">Discovery</a>
+      <a href="/api/health">Health</a>
     </div>
   </div>
 </body>
