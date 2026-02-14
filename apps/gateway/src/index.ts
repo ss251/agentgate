@@ -935,5 +935,6 @@ console.log(`📊 Dashboard: http://localhost:${PORT}/dashboard`);
 
 export default {
   port: PORT,
+  hostname: '0.0.0.0',
   fetch: app.fetch,
 };
