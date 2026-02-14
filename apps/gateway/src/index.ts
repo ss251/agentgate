@@ -221,6 +221,36 @@ app.get('/.well-known/x-agentgate.json', (c) =>
   })
 );
 
+// ─── A2A Protocol Agent Card ─────────────────────────────────────
+app.get('/.well-known/agent.json', (c) =>
+  c.json({
+    name: 'AgentGate',
+    description: 'On-chain gateway for AI agents. Pay-per-call API endpoints (code execution, web scraping, LLM chat, site deployment) using pathUSD stablecoin on Tempo blockchain via HTTP 402.',
+    url: 'https://tempo-agentgategateway-production.up.railway.app',
+    version: VERSION,
+    capabilities: {
+      streaming: false,
+      pushNotifications: false,
+    },
+    skills: [
+      { id: 'chat', name: 'LLM Chat', description: 'Groq-powered fast inference (llama-3.3-70b)', inputModes: ['application/json'], outputModes: ['application/json'] },
+      { id: 'execute', name: 'Code Execution', description: 'Run TypeScript, Python, or shell code in sandbox', inputModes: ['application/json'], outputModes: ['application/json'] },
+      { id: 'scrape', name: 'Web Scraping', description: 'Fetch and extract readable content from any URL', inputModes: ['application/json'], outputModes: ['application/json'] },
+      { id: 'deploy', name: 'Site Deployment', description: 'Deploy HTML to a live public URL', inputModes: ['application/json'], outputModes: ['application/json'] },
+    ],
+    payment: {
+      protocol: 'x402',
+      chain: { id: 42431, name: 'Tempo Testnet', caip2: 'eip155:42431' },
+      token: { symbol: 'pathUSD', address: STABLECOINS.pathUSD.address, decimals: 6 },
+      recipient: PROVIDER_ADDRESS,
+    },
+    discovery: '/.well-known/x-agentgate.json',
+    mcp: { package: '@tempo-agentgate/mcp', registry: 'npm' },
+    sdk: { package: '@tempo-agentgate/sdk', registry: 'npm' },
+    provider: { name: 'AgentGate', url: 'https://github.com/ss251/agentgate' },
+  })
+);
+
 // ─── Free Endpoints ──────────────────────────────────────────────
 app.get('/api/health', (c) =>
   c.json({
