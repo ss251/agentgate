@@ -285,6 +285,7 @@ export class AgentGateClient {
           to: payment.recipientAddress,
           tokenAddress: payment.tokenAddress,
           amount: requiredAmount,
+          memo: payment.memo as Hex | undefined,
         });
 
         this.emit({ type: 'payment_confirmed', txHash });
@@ -401,6 +402,7 @@ export class AgentGateClient {
             to: task.payment.recipientAddress,
             tokenAddress: task.payment.tokenAddress,
             amount: BigInt(task.payment.amountRequired),
+            memo: task.payment.memo as Hex | undefined,
           });
 
           this.emit({ type: 'payment_confirmed', txHash });
@@ -496,58 +498,102 @@ export class AgentGateClient {
       return results.map((r, i) => r ?? initialResponses[i]!) as Response[];
     }
 
-    // Phase 2: Batch payments
-    // With Tempo's native batch transactions, all these transfers would be encoded
-    // as a single atomic batch call:
-    //
-    //   const batchCalls = paymentTasks.map(t => ({
-    //     target: t.payment.tokenAddress,
-    //     data: encodeFunctionData({
-    //       abi: ERC20_ABI,
-    //       functionName: 'transfer',
-    //       args: [t.payment.recipientAddress, BigInt(t.payment.amountRequired)]
-    //     })
-    //   }));
-    //   const txHash = await tempoAccount.executeBatch(batchCalls);
-    //
-    // This ensures atomicity: either ALL payments succeed or NONE do.
-    // For now, we fall back to parallel individual transfers.
+    // Phase 2: Batch payments using Tempo's native batch transaction
+    // Tempo supports atomic batch transactions via the `calls` vector in TempoTransaction.
+    // All ERC-20 transfers are bundled into a single transaction — one signature, one tx hash.
+    // All calls succeed or all fail (atomic execution).
 
-    console.log(`[AgentGate] 📦 Batch: ${paymentTasks.length} payments to process`);
+    console.log(`[AgentGate] 📦 Batch: ${paymentTasks.length} payments in single Tempo batch tx`);
 
-    const txHashes: Array<{ index: number; txHash: Hex; request: { url: string; init?: RequestInit } }> = [];
+    for (const task of paymentTasks) {
+      this.emit({
+        type: 'payment_required',
+        amount: task.payment.amountHuman ?? task.payment.amountRequired,
+        token: task.payment.tokenSymbol ?? 'pathUSD',
+        endpoint: task.request.url,
+      });
+    }
 
-    // Send payments (parallel, leveraging Tempo's 2D nonces)
-    const paymentResults = await Promise.all(
-      paymentTasks.map(async (task) => {
-        this.emit({
-          type: 'payment_required',
-          amount: task.payment.amountHuman ?? task.payment.amountRequired,
-          token: task.payment.tokenSymbol ?? 'pathUSD',
-          endpoint: task.request.url,
-        });
+    // Build batch calls — one ERC-20 transfer per payment
+    const batchCalls = paymentTasks.map((task) => ({
+      to: task.payment.tokenAddress as Address,
+      data: encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'transfer',
+        args: [task.payment.recipientAddress as Address, BigInt(task.payment.amountRequired)],
+      }),
+    }));
 
-        const txHash = await this.sendPayment({
-          to: task.payment.recipientAddress,
-          tokenAddress: task.payment.tokenAddress,
-          amount: BigInt(task.payment.amountRequired),
-        });
+    let batchTxHash: Hex;
 
-        this.emit({ type: 'payment_confirmed', txHash });
-        return { index: task.index, txHash, request: task.request };
-      })
-    );
+    if (this.privyConfig) {
+      // Privy doesn't support batch calls — fall back to parallel individual transfers
+      console.log(`[AgentGate] ⚠️ Privy wallet: falling back to parallel individual transfers`);
+      const paymentResults = await Promise.all(
+        paymentTasks.map(async (task) => {
+          const txHash = await this.sendPayment({
+            to: task.payment.recipientAddress,
+            tokenAddress: task.payment.tokenAddress,
+            amount: BigInt(task.payment.amountRequired),
+            memo: task.payment.memo as Hex | undefined,
+          });
+          this.emit({ type: 'payment_confirmed', txHash });
+          return { index: task.index, txHash, request: task.request };
+        })
+      );
 
-    // Phase 3: Retry all paid requests with payment headers
+      // Retry with individual tx hashes
+      const retryResults = await Promise.all(
+        paymentResults.map(async ({ index, txHash, request }) => {
+          const retryHeaders = new Headers(request.init?.headers);
+          retryHeaders.set('X-Payment', `${txHash}:${this.chain.id}`);
+          const response = await globalThis.fetch(request.url, {
+            ...request.init,
+            headers: retryHeaders,
+          });
+          return { index, response };
+        })
+      );
+
+      for (const { index, response } of retryResults) {
+        results[index] = response;
+      }
+
+      return results as Response[];
+    }
+
+    // Native Tempo batch transaction — single tx for all payments
+    const walletClient = createWalletClient({
+      account: this.account!,
+      chain: this.chain,
+      transport: http(this.rpcUrl),
+    });
+
+    // Tempo's sendTransaction accepts a `calls` array for batch execution
+    // Each call is atomically executed — all succeed or all revert
+    batchTxHash = await walletClient.sendTransaction({
+      calls: batchCalls,
+    } as any);
+
+    const publicClient = createPublicClient({
+      chain: this.chain,
+      transport: http(this.rpcUrl),
+    });
+
+    await publicClient.waitForTransactionReceipt({ hash: batchTxHash, confirmations: 1 });
+    this.emit({ type: 'payment_confirmed', txHash: batchTxHash });
+    console.log(`[AgentGate] ✅ Batch payment sent: ${batchTxHash}`);
+
+    // Phase 3: Retry all paid requests with the single batch tx hash
     const retryResults = await Promise.all(
-      paymentResults.map(async ({ index, txHash, request }) => {
-        const retryHeaders = new Headers(request.init?.headers);
-        retryHeaders.set('X-Payment', `${txHash}:${this.chain.id}`);
-        const response = await globalThis.fetch(request.url, {
-          ...request.init,
+      paymentTasks.map(async (task) => {
+        const retryHeaders = new Headers(task.request.init?.headers);
+        retryHeaders.set('X-Payment', `${batchTxHash}:${this.chain.id}`);
+        const response = await globalThis.fetch(task.request.url, {
+          ...task.request.init,
           headers: retryHeaders,
         });
-        return { index, response };
+        return { index: task.index, response };
       })
     );
 
@@ -566,12 +612,19 @@ export class AgentGateClient {
     to: Address;
     tokenAddress: Address;
     amount: bigint;
+    memo?: Hex;
   }): Promise<Hex> {
-    const data = encodeFunctionData({
-      abi: ERC20_ABI,
-      functionName: 'transfer',
-      args: [params.to, params.amount],
-    });
+    const data = params.memo
+      ? encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: 'transferWithMemo',
+          args: [params.to, params.amount, params.memo],
+        })
+      : encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: 'transfer',
+          args: [params.to, params.amount],
+        });
 
     if (this.privyConfig) {
       // Privy path — delegated signing with fee sponsorship
