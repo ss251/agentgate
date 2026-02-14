@@ -38,6 +38,10 @@ const transferEventAbi = parseAbi([
   'event Transfer(address indexed from, address indexed to, uint256 value)',
 ]);
 
+const transferWithMemoEventAbi = parseAbi([
+  'event TransferWithMemo(address indexed from, address indexed to, uint256 value, bytes32 memo)',
+]);
+
 /**
  * Verify an on-chain TIP-20 (ERC-20) transfer on Tempo.
  * Checks: tx exists, correct token, correct recipient, sufficient amount.
@@ -66,17 +70,25 @@ export async function verifyPayment(params: {
       return { valid: false, error: 'Transaction failed on-chain', txHash: params.txHash };
     }
 
-    // Find Transfer event to the recipient from the correct token contract
-    const transferLog = receipt.logs.find((log) => {
+    const ZERO_MEMO = '0x0000000000000000000000000000000000000000000000000000000000000000';
+    const hasMemoRequirement = params.requirement.memo && params.requirement.memo !== ZERO_MEMO;
+
+    // Try TransferWithMemo event first
+    let from: Address | undefined;
+    let to: Address | undefined;
+    let value: bigint | undefined;
+    let onChainMemo: Hex | undefined;
+
+    const memoLog = receipt.logs.find((log) => {
       if (log.address.toLowerCase() !== params.requirement.tokenAddress.toLowerCase()) return false;
       try {
         const decoded = decodeEventLog({
-          abi: transferEventAbi,
+          abi: transferWithMemoEventAbi,
           data: log.data,
           topics: log.topics,
         });
         return (
-          decoded.eventName === 'Transfer' &&
+          decoded.eventName === 'TransferWithMemo' &&
           (decoded.args as any).to.toLowerCase() === params.requirement.recipientAddress.toLowerCase()
         );
       } catch {
@@ -84,41 +96,90 @@ export async function verifyPayment(params: {
       }
     });
 
-    if (!transferLog) {
+    if (memoLog) {
+      const decoded = decodeEventLog({
+        abi: transferWithMemoEventAbi,
+        data: memoLog.data,
+        topics: memoLog.topics,
+      });
+      const args = decoded.args as { from: Address; to: Address; value: bigint; memo: Hex };
+      from = args.from;
+      to = args.to;
+      value = args.value;
+      onChainMemo = args.memo;
+    } else {
+      // Fall back to plain Transfer event
+      const transferLog = receipt.logs.find((log) => {
+        if (log.address.toLowerCase() !== params.requirement.tokenAddress.toLowerCase()) return false;
+        try {
+          const decoded = decodeEventLog({
+            abi: transferEventAbi,
+            data: log.data,
+            topics: log.topics,
+          });
+          return (
+            decoded.eventName === 'Transfer' &&
+            (decoded.args as any).to.toLowerCase() === params.requirement.recipientAddress.toLowerCase()
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      if (!transferLog) {
+        return {
+          valid: false,
+          error: 'No matching Transfer event found',
+          txHash: params.txHash,
+          blockNumber: receipt.blockNumber,
+        };
+      }
+
+      const decoded = decodeEventLog({
+        abi: transferEventAbi,
+        data: transferLog.data,
+        topics: transferLog.topics,
+      });
+      const args = decoded.args as { from: Address; to: Address; value: bigint };
+      from = args.from;
+      to = args.to;
+      value = args.value;
+    }
+
+    const requiredAmount = BigInt(params.requirement.amountRequired);
+
+    if (value! < requiredAmount) {
       return {
         valid: false,
-        error: 'No matching Transfer event found',
+        error: `Insufficient payment: got ${value}, need ${requiredAmount}`,
+        from,
+        to,
+        amount: value,
         txHash: params.txHash,
         blockNumber: receipt.blockNumber,
       };
     }
 
-    const decoded = decodeEventLog({
-      abi: transferEventAbi,
-      data: transferLog.data,
-      topics: transferLog.topics,
-    });
-
-    const args = decoded.args as { from: Address; to: Address; value: bigint };
-    const requiredAmount = BigInt(params.requirement.amountRequired);
-
-    if (args.value < requiredAmount) {
-      return {
-        valid: false,
-        error: `Insufficient payment: got ${args.value}, need ${requiredAmount}`,
-        from: args.from,
-        to: args.to,
-        amount: args.value,
-        txHash: params.txHash,
-        blockNumber: receipt.blockNumber,
-      };
+    // Verify memo if required
+    if (hasMemoRequirement && onChainMemo) {
+      if (onChainMemo.toLowerCase() !== params.requirement.memo.toLowerCase()) {
+        return {
+          valid: false,
+          error: `Memo mismatch: expected ${params.requirement.memo}, got ${onChainMemo}`,
+          from,
+          to,
+          amount: value,
+          txHash: params.txHash,
+          blockNumber: receipt.blockNumber,
+        };
+      }
     }
 
     return {
       valid: true,
-      from: args.from,
-      to: args.to,
-      amount: args.value,
+      from,
+      to,
+      amount: value,
       txHash: params.txHash,
       blockNumber: receipt.blockNumber,
     };

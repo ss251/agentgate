@@ -92,6 +92,61 @@ describe('fetchBatch', () => {
     expect(calls[1].data.startsWith('0xa9059cbb')).toBe(true);
   });
 
+  it('should build transferWithMemo call data with correct selector', async () => {
+    const memo = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' as Hex;
+    const data = encodeFunctionData({
+      abi: ERC20_ABI,
+      functionName: 'transferWithMemo',
+      args: [RECIPIENT_A, BigInt('10000'), memo],
+    });
+
+    expect(data).toMatch(/^0x/);
+    // transferWithMemo(address,uint256,bytes32) has a different selector than transfer
+    // It should NOT be 0xa9059cbb (that's transfer)
+    expect(data.startsWith('0xa9059cbb')).toBe(false);
+    // Should be valid calldata (at least 4 bytes selector + 3 * 32 bytes params = 4+96 = 200 hex chars + 0x)
+    expect(data.length).toBeGreaterThanOrEqual(202);
+  });
+
+  it('should pass memo from 402 response to sendPayment', async () => {
+    const MEMO = '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' as Hex;
+    let fetchCallCount = 0;
+
+    globalThis.fetch = mock(async (url: string | URL | Request, init?: RequestInit) => {
+      fetchCallCount++;
+      if (fetchCallCount === 1) {
+        return new Response(
+          JSON.stringify({
+            payment: {
+              recipientAddress: RECIPIENT_A,
+              amountRequired: '10000',
+              amountHuman: '0.01',
+              tokenAddress: PATHUSD,
+              tokenSymbol: 'pathUSD',
+              memo: MEMO,
+            },
+          }),
+          { status: 402, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return make200Response('success');
+    }) as any;
+
+    const client = new AgentGateClient({ privateKey: FAKE_PRIVATE_KEY });
+
+    // Monkey-patch sendPayment to capture the memo parameter
+    let capturedMemo: Hex | undefined;
+    const origSendPayment = client.sendPayment.bind(client);
+    (client as any).sendPayment = async (params: any) => {
+      capturedMemo = params.memo;
+      return FAKE_TX_HASH;
+    };
+
+    const response = await client.fetch('http://test.local/api');
+    expect(capturedMemo).toBe(MEMO);
+    expect(response.status).toBe(200);
+  });
+
   it('should use single batch tx hash for all retry requests when 402s are encountered', async () => {
     // This test verifies the retry logic: after paying, all retries should use
     // the same X-Payment header with the batch tx hash.

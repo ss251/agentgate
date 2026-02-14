@@ -37,12 +37,33 @@ export const ERC20_ABI = [
     stateMutability: 'nonpayable',
   },
   {
+    type: 'function',
+    name: 'transferWithMemo',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'memo', type: 'bytes32' },
+    ],
+    outputs: [{ type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
     type: 'event',
     name: 'Transfer',
     inputs: [
       { name: 'from', type: 'address', indexed: true },
       { name: 'to', type: 'address', indexed: true },
       { name: 'value', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'TransferWithMemo',
+    inputs: [
+      { name: 'from', type: 'address', indexed: true },
+      { name: 'to', type: 'address', indexed: true },
+      { name: 'value', type: 'uint256', indexed: false },
+      { name: 'memo', type: 'bytes32', indexed: false },
     ],
   },
 ] as const;
