@@ -1221,355 +1221,309 @@ app.get('/', (c) => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AgentGate — Monetize Your APIs with Crypto Payments</title>
-  <meta name="description" content="Two-sided marketplace: API providers monetize with one line of middleware, AI agents pay with stablecoins on Tempo. Powered by Privy server wallets.">
+  <title>AgentGate — HTTP 402 Payment Gateway for AI Agents</title>
+  <meta name="description" content="AI agents pay for APIs with stablecoins. Providers monetize with one line of middleware. Built on Tempo.">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{fontFamily:{mono:['JetBrains Mono','ui-monospace','SFMono-Regular','monospace']},colors:{ag:{50:'#f0f4ff',100:'#e0e7ff',400:'#818cf8',500:'#6366f1',600:'#4f46e5',900:'#1e1b4b'}}}}}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
-    .float { animation: float 3s ease-in-out infinite; }
-    .gradient-text { background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .glow { box-shadow: 0 0 40px rgba(96, 165, 250, 0.15); }
-    .privy-glow { box-shadow: 0 0 40px rgba(167, 139, 250, 0.15); }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .code-block { background: #0d1117; border: 1px solid #21262d; }
+    .line-num { color: #484f58; user-select: none; }
+    .tok-kw { color: #ff7b72; }
+    .tok-str { color: #a5d6ff; }
+    .tok-fn { color: #d2a8ff; }
+    .tok-cm { color: #8b949e; }
+    .tok-const { color: #79c0ff; }
+    .tok-op { color: #c9d1d9; }
   </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen">
+<body class="bg-[#0a0a0a] text-[#ededed] min-h-screen antialiased">
+
+  <!-- Nav -->
+  <nav class="border-b border-white/5">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <a href="/" class="text-[15px] font-semibold tracking-tight">AgentGate</a>
+        <div class="hidden sm:flex items-center gap-5 text-[13px] text-[#888]">
+          <a href="/dashboard" class="hover:text-white transition">Dashboard</a>
+          <a href="/providers" class="hover:text-white transition">Marketplace</a>
+          <a href="/.well-known/x-agentgate.json" class="hover:text-white transition">API</a>
+          <a href="https://github.com/ss251/agentgate" class="hover:text-white transition">GitHub</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/auth/passkey" class="text-[13px] text-[#888] hover:text-white transition">Sign in</a>
+        <a href="/providers" class="text-[13px] bg-white text-black px-3 py-1.5 rounded-md font-medium hover:bg-white/90 transition">List your API</a>
+      </div>
+    </div>
+  </nav>
+
   <!-- Hero -->
-  <div class="max-w-5xl mx-auto px-6 pt-20 pb-16 text-center">
-    <div class="text-6xl mb-6 float">🚪</div>
-    <h1 class="text-5xl md:text-6xl font-bold mb-4">
-      <span class="gradient-text">Monetize Your APIs</span><br>
-      <span class="text-3xl md:text-4xl text-gray-300">with Crypto Payments</span>
-    </h1>
-    <p class="text-xl text-gray-400 mb-2 max-w-2xl mx-auto">The two-sided marketplace where <strong class="text-white">API providers</strong> earn pathUSD and <strong class="text-white">AI agents</strong> pay per call — powered by HTTP 402</p>
-    <p class="text-lg text-gray-500 mb-10">Bring Your Own Backend · One line of middleware · Instant stablecoin payments</p>
-    <div class="flex gap-4 justify-center flex-wrap">
-      <a href="/providers" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition">Register Your API →</a>
-      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition">Live Dashboard</a>
-      <a href="https://github.com/ss251/agentgate" class="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition border border-gray-700">GitHub ↗</a>
-    </div>
-  </div>
-
-  <!-- How It Works — Two Sides -->
-  <div class="max-w-5xl mx-auto px-6 pb-16">
-    <h2 class="text-3xl font-bold text-center mb-10">How It Works</h2>
-    <div class="grid md:grid-cols-2 gap-8">
-      <!-- Provider Side -->
-      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        <h3 class="text-xl font-bold mb-4 text-purple-400">🏪 For Providers</h3>
-        <p class="text-gray-400 text-sm mb-4">Monetize any API with one line of middleware</p>
-        <div class="space-y-3">
-          <div class="flex items-start gap-3"><span class="bg-purple-900 text-purple-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">1</span><div><div class="font-medium">Add paywall() middleware</div><div class="text-gray-400 text-sm">Works with any Hono app — one import, one line</div></div></div>
-          <div class="flex items-start gap-3"><span class="bg-purple-900 text-purple-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">2</span><div><div class="font-medium">Set your prices</div><div class="text-gray-400 text-sm">Per-endpoint pricing in pathUSD stablecoins</div></div></div>
-          <div class="flex items-start gap-3"><span class="bg-purple-900 text-purple-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">3</span><div><div class="font-medium">Get paid on every call</div><div class="text-gray-400 text-sm">Payments go directly to your wallet on Tempo</div></div></div>
-        </div>
+  <section class="max-w-6xl mx-auto px-6 pt-24 pb-20">
+    <div class="max-w-3xl">
+      <p class="text-[13px] font-medium text-ag-400 mb-4 tracking-wide uppercase">HTTP 402 Payment Protocol</p>
+      <h1 class="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-5">
+        AI agents pay for APIs<br>with stablecoins.
+      </h1>
+      <p class="text-lg text-[#888] leading-relaxed max-w-xl mb-8">
+        AgentGate turns any API into a paid service. Agents get a 402, pay on-chain, and retry — all in one round trip. No API keys. No subscriptions. Just code and crypto.
+      </p>
+      <div class="flex items-center gap-3 mb-12">
+        <a href="#how-it-works" class="text-sm bg-white text-black px-5 py-2.5 rounded-md font-medium hover:bg-white/90 transition">How it works</a>
+        <a href="#code" class="text-sm text-[#888] border border-white/10 px-5 py-2.5 rounded-md font-medium hover:text-white hover:border-white/20 transition">View code</a>
       </div>
-      <!-- Agent Side -->
-      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
-        <h3 class="text-xl font-bold mb-4 text-blue-400">🤖 For Agents</h3>
-        <p class="text-gray-400 text-sm mb-4">Discover and pay for APIs automatically</p>
-        <div class="space-y-3">
-          <div class="flex items-start gap-3"><span class="bg-blue-900 text-blue-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">1</span><div><div class="font-medium">Discover services</div><div class="text-gray-400 text-sm">Auto-discover via .well-known/x-agentgate.json</div></div></div>
-          <div class="flex items-start gap-3"><span class="bg-blue-900 text-blue-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">2</span><div><div class="font-medium">Pay with pathUSD</div><div class="text-gray-400 text-sm">SDK auto-handles 402 → pay → retry flow</div></div></div>
-          <div class="flex items-start gap-3"><span class="bg-blue-900 text-blue-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">3</span><div><div class="font-medium">Get results</div><div class="text-gray-400 text-sm">On-chain verified, no API keys needed</div></div></div>
-        </div>
+      <!-- The 402 flow, shown as a terminal-style sequence -->
+      <div class="code-block rounded-lg p-5 text-[13px] leading-6">
+        <div><span class="tok-cm"># Agent calls a paid API</span></div>
+        <div><span class="tok-const">$</span> curl -X POST ${BASE_URL}/api/chat</div>
+        <div class="mt-2"><span class="tok-cm"># Gateway responds: pay first</span></div>
+        <div><span class="tok-kw">HTTP 402</span> Payment Required</div>
+        <div class="text-[#8b949e]">X-Payment-Amount: 0.005</div>
+        <div class="text-[#8b949e]">X-Payment-Token: pathUSD</div>
+        <div class="text-[#8b949e]">X-Payment-Recipient: ${PROVIDER_ADDRESS.slice(0, 18)}…</div>
+        <div class="mt-2"><span class="tok-cm"># Agent pays on Tempo, retries with tx hash</span></div>
+        <div><span class="tok-const">$</span> curl -X POST ${BASE_URL}/api/chat \\</div>
+        <div>  -H <span class="tok-str">"X-Payment-Hash: 0xabc…def"</span></div>
+        <div class="mt-2"><span class="tok-kw">HTTP 200</span> OK</div>
+        <div class="text-[#8b949e]">{ "response": "Quantum computing uses qubits…" }</div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Live Services -->
-  <div class="max-w-5xl mx-auto px-6 pb-16">
-    <h2 class="text-3xl font-bold text-center mb-3">Live Services</h2>
-    <p class="text-gray-400 text-center mb-10">Try them now — real endpoints, real payments on Tempo testnet</p>
-    <div class="grid md:grid-cols-2 gap-6">
-      <!-- Featured: Chat -->
-      <div class="bg-gray-900 rounded-xl p-6 border-2 border-purple-700 glow md:col-span-2">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-3">
-            <span class="text-3xl">🧠</span>
-            <div>
-              <h3 class="text-xl font-semibold">LLM Inference</h3>
-              <span class="text-gray-400 text-sm">Groq-powered llama-3.3-70b — blazing fast</span>
-            </div>
-          </div>
-          <div class="text-right">
-            <span class="text-green-400 font-mono text-lg">0.005 pathUSD</span>
-            <div class="text-xs text-gray-500">per request</div>
-          </div>
+  <!-- How it works -->
+  <section id="how-it-works" class="border-t border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-20">
+      <h2 class="text-2xl font-semibold tracking-tight mb-12">How it works</h2>
+      <div class="grid md:grid-cols-3 gap-px bg-white/5 rounded-lg overflow-hidden">
+        <div class="bg-[#0a0a0a] p-8">
+          <div class="text-[13px] font-mono text-ag-400 mb-3">01</div>
+          <h3 class="text-[15px] font-semibold mb-2">Agent discovers services</h3>
+          <p class="text-[14px] text-[#888] leading-relaxed">Standard <code class="text-[13px] text-[#ccc]">/.well-known/x-agentgate.json</code> endpoint lists available APIs, prices, and payment details. No signup required.</p>
         </div>
-        <p class="text-gray-400 text-sm mb-3">OpenAI-compatible chat completions API. Send messages or a simple prompt — get intelligent responses in milliseconds.</p>
-        <code class="text-xs text-purple-400 font-mono">POST /api/chat</code>
-        <span class="ml-2 bg-green-900 text-green-300 px-2 py-0.5 rounded text-xs">⭐ Featured</span>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <div class="flex items-center justify-between mb-4">
-          <span class="text-2xl">⚡</span>
-          <span class="text-green-400 font-mono text-sm">0.01 pathUSD</span>
+        <div class="bg-[#0a0a0a] p-8">
+          <div class="text-[13px] font-mono text-ag-400 mb-3">02</div>
+          <h3 class="text-[15px] font-semibold mb-2">402 triggers payment</h3>
+          <p class="text-[14px] text-[#888] leading-relaxed">Agent hits a paid endpoint, gets HTTP 402 with payment instructions. The SDK sends pathUSD on Tempo — confirmation in ~2 seconds.</p>
         </div>
-        <h3 class="text-lg font-semibold mb-2">Code Execution</h3>
-        <p class="text-gray-400 text-sm mb-3">Run TypeScript, Python, or shell in a sandboxed environment</p>
-        <code class="text-xs text-gray-500 font-mono">POST /api/execute</code>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <div class="flex items-center justify-between mb-4">
-          <span class="text-2xl">🌐</span>
-          <span class="text-green-400 font-mono text-sm">0.005 pathUSD</span>
-        </div>
-        <h3 class="text-lg font-semibold mb-2">Web Scraping</h3>
-        <p class="text-gray-400 text-sm mb-3">Fetch and extract structured content from any URL</p>
-        <code class="text-xs text-gray-500 font-mono">POST /api/scrape</code>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800">
-        <div class="flex items-center justify-between mb-4">
-          <span class="text-2xl">🚀</span>
-          <span class="text-green-400 font-mono text-sm">0.05 pathUSD</span>
-        </div>
-        <h3 class="text-lg font-semibold mb-2">Site Deployment</h3>
-        <p class="text-gray-400 text-sm mb-3">Deploy HTML to a live URL instantly</p>
-        <code class="text-xs text-gray-500 font-mono">POST /api/deploy</code>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 border-dashed flex flex-col items-center justify-center text-center">
-        <div class="text-3xl mb-2">➕</div>
-        <h3 class="text-lg font-semibold mb-1">Your API Here</h3>
-        <p class="text-gray-400 text-sm mb-3">Bring your own backend and start earning</p>
-        <a href="/providers" class="text-purple-400 hover:underline text-sm">Register now →</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Powered by Privy -->
-  <div class="max-w-5xl mx-auto px-6 pb-16">
-    <div class="bg-gray-900 rounded-xl border border-purple-800 p-8 privy-glow">
-      <div class="text-center mb-6">
-        <h2 class="text-2xl font-bold mb-2">🔐 Powered by <span class="text-purple-400">Privy</span></h2>
-        <p class="text-gray-400">Server wallets for AI agents — no seed phrases, no complexity</p>
-      </div>
-      <div class="grid md:grid-cols-3 gap-6 text-center">
-        <div>
-          <div class="text-3xl mb-2">⚡</div>
-          <h3 class="font-semibold mb-1">Instant Wallets</h3>
-          <p class="text-gray-400 text-sm">Create agent wallets with a single API call. No seed phrases, no key management.</p>
-        </div>
-        <div>
-          <div class="text-3xl mb-2">🛡️</div>
-          <h3 class="font-semibold mb-1">Secure Key Management</h3>
-          <p class="text-gray-400 text-sm">Privy manages private keys in secure enclaves. Your agents never touch raw keys.</p>
-        </div>
-        <div>
-          <div class="text-3xl mb-2">💸</div>
-          <h3 class="font-semibold mb-1">Fee Sponsorship</h3>
-          <p class="text-gray-400 text-sm">Automatic gas sponsorship — agents only need pathUSD, never native tokens.</p>
-        </div>
-      </div>
-      <div class="mt-6 text-center">
-        <code class="text-sm text-gray-500 bg-gray-800 px-4 py-2 rounded-lg">POST /api/wallets/create → { walletId, address } — that's it!</code>
-      </div>
-    </div>
-  </div>
-
-  <!-- Built on Tempo -->
-  <div class="max-w-5xl mx-auto px-6 pb-16">
-    <div class="bg-gray-900 rounded-xl border border-blue-800 p-8 glow">
-      <div class="text-center mb-6">
-        <h2 class="text-2xl font-bold mb-2">⛓️ Built on <span class="text-blue-400">Tempo</span></h2>
-        <p class="text-gray-400">The chain purpose-built for agent payments</p>
-      </div>
-      <div class="grid md:grid-cols-4 gap-4 text-center">
-        <div>
-          <div class="text-xl font-bold text-blue-400">~2s</div>
-          <div class="text-gray-400 text-sm">Finality</div>
-        </div>
-        <div>
-          <div class="text-xl font-bold text-blue-400">$0</div>
-          <div class="text-gray-400 text-sm">Gas fees (sponsored)</div>
-        </div>
-        <div>
-          <div class="text-xl font-bold text-blue-400">pathUSD</div>
-          <div class="text-gray-400 text-sm">Stablecoin payments</div>
-        </div>
-        <div>
-          <div class="text-xl font-bold text-blue-400">TIP-20</div>
-          <div class="text-gray-400 text-sm">Native token standard</div>
+        <div class="bg-[#0a0a0a] p-8">
+          <div class="text-[13px] font-mono text-ag-400 mb-3">03</div>
+          <h3 class="text-[15px] font-semibold mb-2">Verify and serve</h3>
+          <p class="text-[14px] text-[#888] leading-relaxed">Gateway verifies the tx on-chain, credits the provider's wallet, and returns the API response. One round trip.</p>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Tempo-Native Features -->
-  <div class="max-w-5xl mx-auto px-6 pb-16">
-    <div class="bg-gray-900 rounded-xl border border-gray-800 p-8">
-      <h2 class="text-2xl font-bold text-center mb-6">⚡ Tempo-Native Features</h2>
-      <p class="text-gray-400 text-center mb-8">AgentGate leverages Tempo's unique blockchain features purpose-built for agent payments</p>
-      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div class="text-center">
-          <div class="text-3xl mb-2">🔐</div>
-          <h3 class="font-semibold mb-1">Passkey Accounts</h3>
-          <p class="text-gray-400 text-sm">Providers authenticate with Face ID / Touch ID via Tempo's native P256/WebAuthn support</p>
+  <!-- Services -->
+  <section class="border-t border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-20">
+      <div class="flex items-end justify-between mb-10">
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight mb-1">Live endpoints</h2>
+          <p class="text-[14px] text-[#888]">Running on Tempo testnet. Real payments, real services.</p>
         </div>
-        <div class="text-center">
-          <div class="text-3xl mb-2">⚡</div>
-          <h3 class="font-semibold mb-1">Parallel Payments</h3>
-          <p class="text-gray-400 text-sm">Multiple payments in one block using Tempo's 2D expiring nonce system</p>
-        </div>
-        <div class="text-center">
-          <div class="text-3xl mb-2">📦</div>
-          <h3 class="font-semibold mb-1">Batch Transactions</h3>
-          <p class="text-gray-400 text-sm">Atomic multi-service payments in a single transaction</p>
-        </div>
-        <div class="text-center">
-          <div class="text-3xl mb-2">🏷️</div>
-          <h3 class="font-semibold mb-1">Transfer Memos</h3>
-          <p class="text-gray-400 text-sm">On-chain request fingerprints for payment reconciliation</p>
-        </div>
-        <div class="text-center">
-          <div class="text-3xl mb-2">💸</div>
-          <h3 class="font-semibold mb-1">Fee Sponsorship</h3>
-          <p class="text-gray-400 text-sm">Agents pay zero gas fees — Tempo sponsors all transaction costs</p>
-        </div>
-        <div class="text-center">
-          <div class="text-3xl mb-2">🔑</div>
-          <h3 class="font-semibold mb-1">Account Abstraction</h3>
-          <p class="text-gray-400 text-sm">Native smart accounts with session keys and spending limits</p>
-        </div>
+        <a href="/providers" class="text-[13px] text-ag-400 hover:text-ag-100 transition">Add yours →</a>
       </div>
-      <div class="mt-6 text-center">
-        <a href="https://docs.tempo.xyz" target="_blank" class="text-blue-400 hover:underline text-sm">📖 Tempo Documentation →</a>
-        <span class="mx-2 text-gray-600">·</span>
-        <a href="/auth/passkey" class="text-purple-400 hover:underline text-sm">🔐 Try Passkey Auth →</a>
+      <div class="border border-white/5 rounded-lg overflow-hidden">
+        <table class="w-full text-[14px]">
+          <thead>
+            <tr class="border-b border-white/5 text-[12px] text-[#666] uppercase tracking-wider">
+              <th class="text-left px-5 py-3 font-medium">Endpoint</th>
+              <th class="text-left px-5 py-3 font-medium hidden sm:table-cell">Description</th>
+              <th class="text-right px-5 py-3 font-medium">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b border-white/5 hover:bg-white/[0.02] transition">
+              <td class="px-5 py-4"><code class="text-[13px]"><span class="text-emerald-400">POST</span> /api/chat</code></td>
+              <td class="px-5 py-4 text-[#888] hidden sm:table-cell">LLM inference — Groq llama-3.3-70b</td>
+              <td class="px-5 py-4 text-right font-mono text-[13px]">0.005 <span class="text-[#666]">pathUSD</span></td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/[0.02] transition">
+              <td class="px-5 py-4"><code class="text-[13px]"><span class="text-emerald-400">POST</span> /api/execute</code></td>
+              <td class="px-5 py-4 text-[#888] hidden sm:table-cell">Sandboxed code execution — TS, Python, shell</td>
+              <td class="px-5 py-4 text-right font-mono text-[13px]">0.010 <span class="text-[#666]">pathUSD</span></td>
+            </tr>
+            <tr class="border-b border-white/5 hover:bg-white/[0.02] transition">
+              <td class="px-5 py-4"><code class="text-[13px]"><span class="text-emerald-400">POST</span> /api/scrape</code></td>
+              <td class="px-5 py-4 text-[#888] hidden sm:table-cell">Web scraping — fetch and extract content</td>
+              <td class="px-5 py-4 text-right font-mono text-[13px]">0.005 <span class="text-[#666]">pathUSD</span></td>
+            </tr>
+            <tr class="hover:bg-white/[0.02] transition">
+              <td class="px-5 py-4"><code class="text-[13px]"><span class="text-emerald-400">POST</span> /api/deploy</code></td>
+              <td class="px-5 py-4 text-[#888] hidden sm:table-cell">Deploy HTML to a live URL</td>
+              <td class="px-5 py-4 text-right font-mono text-[13px]">0.050 <span class="text-[#666]">pathUSD</span></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Bring Your Own API -->
-  <div class="max-w-5xl mx-auto px-6 pb-16">
-    <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl border border-gray-800 p-8 text-center">
-      <h2 class="text-3xl font-bold mb-3">🔌 Bring Your Own Backend</h2>
-      <p class="text-gray-400 mb-6 max-w-2xl mx-auto">AgentGate isn't just a gateway — it's a platform. Any API provider can monetize their service with one line of middleware. LLM inference, data APIs, compute services — if you can serve HTTP, you can earn crypto.</p>
-      <div class="bg-gray-950 rounded-lg p-4 max-w-lg mx-auto mb-6 text-left">
-        <pre class="text-sm overflow-x-auto"><code class="text-purple-300">import { paywall } from '@tempo-agentgate/middleware';
+  <!-- Code -->
+  <section id="code" class="border-t border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-20">
+      <h2 class="text-2xl font-semibold tracking-tight mb-10">Integration</h2>
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div>
+          <div class="text-[12px] text-[#666] uppercase tracking-wider mb-3 font-medium">Agent — pay for APIs</div>
+          <div class="code-block rounded-lg overflow-hidden">
+            <div class="px-5 py-3 border-b border-white/5 text-[12px] text-[#666]">agent.ts</div>
+            <pre class="p-5 text-[13px] leading-6 overflow-x-auto"><code><span class="tok-kw">import</span> { AgentGateClient } <span class="tok-kw">from</span> <span class="tok-str">'@tempo-agentgate/sdk'</span>
 
-// That's it. Your API now accepts crypto payments.
-app.use('/api/*', paywall({
-  recipientAddress: '0xYourWallet',
-  token: 'pathUSD',
-  pricing: {
-    'POST /api/inference': { amount: '0.01' }
-  }
-}));</code></pre>
-      </div>
-      <a href="/providers" class="inline-block bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-medium transition">Register Your API on AgentGate →</a>
-    </div>
-  </div>
+<span class="tok-kw">const</span> agent = <span class="tok-kw">new</span> <span class="tok-fn">AgentGateClient</span>({
+  <span class="tok-cm">// Privy server wallet — no seed phrases</span>
+  privyAppId: <span class="tok-str">'your-app-id'</span>,
+  privyAppSecret: <span class="tok-str">'your-secret'</span>,
+  walletId: <span class="tok-str">'privy-wallet-id'</span>,
+})
 
-  <!-- Code Examples -->
-  <div class="max-w-5xl mx-auto px-6 pb-16">
-    <h2 class="text-3xl font-bold text-center mb-10">For Developers</h2>
-    <div class="grid md:grid-cols-2 gap-6">
-      <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-800 text-sm text-gray-400">🤖 Agent Side — Auto-pay with SDK</div>
-        <pre class="p-4 text-sm overflow-x-auto"><code class="text-green-300">import { AgentGateClient } from '@tempo-agentgate/sdk';
-
-// Use Privy server wallet (recommended)
-const agent = new AgentGateClient({
-  privyAppId: 'your-app-id',
-  privyAppSecret: 'your-secret',
-  walletId: 'privy-wallet-id',
-});
-
-// Or use raw private key
-// const agent = new AgentGateClient({ privateKey: '0x...' });
-
-// Auto: 402 → pay pathUSD → retry → result
-const res = await agent.fetch(
-  '${BASE_URL}/api/chat',
+<span class="tok-cm">// SDK handles 402 → pay → retry automatically</span>
+<span class="tok-kw">const</span> res = <span class="tok-kw">await</span> agent.<span class="tok-fn">fetch</span>(
+  <span class="tok-str">'${BASE_URL}/api/chat'</span>,
   {
-    method: 'POST',
-    body: JSON.stringify({
-      prompt: 'Explain quantum computing'
+    method: <span class="tok-str">'POST'</span>,
+    body: JSON.<span class="tok-fn">stringify</span>({
+      prompt: <span class="tok-str">'Explain quantum computing'</span>
     })
   }
-);</code></pre>
-      </div>
-      <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-800 text-sm text-gray-400">🏪 Provider Side — One line of middleware</div>
-        <pre class="p-4 text-sm overflow-x-auto"><code class="text-purple-300">import { Hono } from 'hono';
-import { paywall } from '@tempo-agentgate/middleware';
+)</code></pre>
+          </div>
+        </div>
+        <div>
+          <div class="text-[12px] text-[#666] uppercase tracking-wider mb-3 font-medium">Provider — monetize any API</div>
+          <div class="code-block rounded-lg overflow-hidden">
+            <div class="px-5 py-3 border-b border-white/5 text-[12px] text-[#666]">server.ts</div>
+            <pre class="p-5 text-[13px] leading-6 overflow-x-auto"><code><span class="tok-kw">import</span> { Hono } <span class="tok-kw">from</span> <span class="tok-str">'hono'</span>
+<span class="tok-kw">import</span> { paywall } <span class="tok-kw">from</span> <span class="tok-str">'@tempo-agentgate/middleware'</span>
 
-const app = new Hono();
+<span class="tok-kw">const</span> app = <span class="tok-kw">new</span> <span class="tok-fn">Hono</span>()
 
-// Add crypto payments to ANY endpoint
-app.use('/api/*', paywall({
-  recipientAddress: '0xYourWallet',
-  token: 'pathUSD',
+<span class="tok-cm">// One line. Your API now accepts crypto.</span>
+app.<span class="tok-fn">use</span>(<span class="tok-str">'/api/*'</span>, <span class="tok-fn">paywall</span>({
+  recipientAddress: <span class="tok-str">'0xYourWallet'</span>,
+  token: <span class="tok-str">'pathUSD'</span>,
   pricing: {
-    'POST /api/generate': {
-      amount: '0.02',
-      description: 'Image generation'
+    <span class="tok-str">'POST /api/generate'</span>: {
+      amount: <span class="tok-str">'0.02'</span>
     }
   }
-}));
+}))
 
-app.post('/api/generate', (c) =&gt;
-  c.json({ image: '...' })
-);</code></pre>
+app.<span class="tok-fn">post</span>(<span class="tok-str">'/api/generate'</span>, (c) =&gt;
+  c.<span class="tok-fn">json</span>({ result: <span class="tok-str">'...'</span> })
+)</code></pre>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- npm Packages -->
-  <div class="max-w-5xl mx-auto px-6 pb-16">
-    <h2 class="text-3xl font-bold text-center mb-10">npm Packages</h2>
-    <div class="grid md:grid-cols-3 gap-6">
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 text-center">
-        <div class="font-mono text-blue-400 mb-2">@tempo-agentgate/sdk</div>
-        <p class="text-gray-400 text-sm">Agent client with auto 402→pay→retry, Privy wallet support, batch calls</p>
+  <!-- Packages -->
+  <section class="border-t border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-20">
+      <h2 class="text-2xl font-semibold tracking-tight mb-10">Packages</h2>
+      <div class="grid md:grid-cols-3 gap-px bg-white/5 rounded-lg overflow-hidden">
+        <div class="bg-[#0a0a0a] p-6">
+          <code class="text-[13px] text-ag-400">@tempo-agentgate/sdk</code>
+          <p class="text-[14px] text-[#888] mt-2">Agent client. Auto 402→pay→retry, Privy wallet integration, batch calls.</p>
+        </div>
+        <div class="bg-[#0a0a0a] p-6">
+          <code class="text-[13px] text-ag-400">@tempo-agentgate/middleware</code>
+          <p class="text-[14px] text-[#888] mt-2">Hono middleware. Add <code class="text-[12px] text-[#ccc]">paywall()</code> to any route — that's the entire integration.</p>
+        </div>
+        <div class="bg-[#0a0a0a] p-6">
+          <code class="text-[13px] text-ag-400">@tempo-agentgate/core</code>
+          <p class="text-[14px] text-[#888] mt-2">Shared types, chain config, token addresses, payment verification.</p>
+        </div>
       </div>
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 text-center">
-        <div class="font-mono text-purple-400 mb-2">@tempo-agentgate/middleware</div>
-        <p class="text-gray-400 text-sm">Hono paywall() middleware — add crypto payments to any API in one line</p>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 text-center">
-        <div class="font-mono text-green-400 mb-2">@tempo-agentgate/core</div>
-        <p class="text-gray-400 text-sm">Shared types, chain config, token addresses, payment verification</p>
+      <div class="mt-4">
+        <div class="code-block rounded-lg px-5 py-3 text-[13px] inline-block">
+          <span class="tok-const">$</span> bun add @tempo-agentgate/sdk @tempo-agentgate/middleware @tempo-agentgate/core
+        </div>
       </div>
     </div>
-    <div class="text-center mt-6">
-      <code class="text-gray-500 text-sm bg-gray-900 px-4 py-2 rounded-lg">bun add @tempo-agentgate/sdk @tempo-agentgate/middleware @tempo-agentgate/core</code>
-    </div>
-  </div>
+  </section>
 
-  <!-- Tech Stack -->
-  <div class="max-w-5xl mx-auto px-6 pb-16">
-    <div class="bg-gray-900 rounded-xl border border-gray-800 p-8">
-      <h2 class="text-2xl font-bold mb-6 text-center">Built With</h2>
-      <div class="flex flex-wrap gap-3 justify-center">
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">⛓️ Tempo</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">🔐 Privy</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">⚡ Bun</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">🔥 Hono</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">📦 TypeScript</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">💰 pathUSD</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">🔗 viem</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">🧪 56 Tests</span>
-      </div>
-      <div class="mt-6 grid md:grid-cols-4 gap-4 text-center text-sm text-gray-400">
-        <div><span class="text-white font-bold text-lg">3</span><br>npm packages</div>
-        <div><span class="text-white font-bold text-lg">~2s</span><br>payment finality</div>
-        <div><span class="text-white font-bold text-lg">$0</span><br>gas fees</div>
-        <div><span class="text-white font-bold text-lg">∞</span><br>providers welcome</div>
+  <!-- Stack -->
+  <section class="border-t border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-20">
+      <h2 class="text-2xl font-semibold tracking-tight mb-10">Stack</h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-[14px]">
+        <div>
+          <div class="text-[#888] text-[12px] uppercase tracking-wider mb-2">Chain</div>
+          <div class="font-medium">Tempo</div>
+          <div class="text-[13px] text-[#666]">~2s finality, $0 gas</div>
+        </div>
+        <div>
+          <div class="text-[#888] text-[12px] uppercase tracking-wider mb-2">Wallets</div>
+          <div class="font-medium">Privy</div>
+          <div class="text-[13px] text-[#666]">Server wallets, no seed phrases</div>
+        </div>
+        <div>
+          <div class="text-[#888] text-[12px] uppercase tracking-wider mb-2">Runtime</div>
+          <div class="font-medium">Bun + Hono</div>
+          <div class="text-[13px] text-[#666]">TypeScript, fast</div>
+        </div>
+        <div>
+          <div class="text-[#888] text-[12px] uppercase tracking-wider mb-2">Token</div>
+          <div class="font-medium">pathUSD</div>
+          <div class="text-[13px] text-[#666]">Stablecoin on Tempo</div>
+        </div>
+        <div>
+          <div class="text-[#888] text-[12px] uppercase tracking-wider mb-2">Auth</div>
+          <div class="font-medium">Passkeys</div>
+          <div class="text-[13px] text-[#666]">Tempo-native P256/WebAuthn</div>
+        </div>
+        <div>
+          <div class="text-[#888] text-[12px] uppercase tracking-wider mb-2">Discovery</div>
+          <div class="font-medium">.well-known</div>
+          <div class="text-[13px] text-[#666]">Standard service manifest</div>
+        </div>
+        <div>
+          <div class="text-[#888] text-[12px] uppercase tracking-wider mb-2">Payments</div>
+          <div class="font-medium">HTTP 402</div>
+          <div class="text-[13px] text-[#666]">Finally using that status code</div>
+        </div>
+        <div>
+          <div class="text-[#888] text-[12px] uppercase tracking-wider mb-2">On-chain</div>
+          <div class="font-medium">viem</div>
+          <div class="text-[13px] text-[#666]">Type-safe Ethereum interactions</div>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="border-t border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-20 text-center">
+      <h2 class="text-2xl font-semibold tracking-tight mb-3">Start building</h2>
+      <p class="text-[14px] text-[#888] mb-8 max-w-md mx-auto">Monetize your API in minutes. No signup, no API keys — just middleware and a wallet address.</p>
+      <div class="flex items-center gap-3 justify-center">
+        <a href="/providers" class="text-sm bg-white text-black px-5 py-2.5 rounded-md font-medium hover:bg-white/90 transition">Register your API</a>
+        <a href="https://github.com/ss251/agentgate" class="text-sm text-[#888] border border-white/10 px-5 py-2.5 rounded-md font-medium hover:text-white hover:border-white/20 transition">View source</a>
+      </div>
+    </div>
+  </section>
 
   <!-- Footer -->
-  <div class="max-w-5xl mx-auto px-6 pb-10 text-center text-gray-600 text-sm">
-    Built for the <a href="https://canteenapp-tempo.notion.site/" class="text-blue-400 hover:underline">Canteen × Tempo Hackathon</a> · 
-    Track 3: AI Agents & Automation · 
-    Wallets by <a href="https://privy.io" class="text-purple-400 hover:underline">Privy</a> · 
-    Payments on <a href="https://tempo.xyz" class="text-blue-400 hover:underline">Tempo</a> ·
-    <a href="https://github.com/ss251/agentgate" class="text-blue-400 hover:underline">Source</a> · 
-    <a href="/dashboard" class="text-blue-400 hover:underline">Dashboard</a> · 
-    <a href="/providers" class="text-blue-400 hover:underline">Marketplace</a>
-  </div>
+  <footer class="border-t border-white/5">
+    <div class="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-[#555]">
+      <div>Built for <a href="https://canteenapp-tempo.notion.site/" class="text-[#888] hover:text-white transition">Canteen × Tempo Hackathon</a> · Track 3: AI Agents</div>
+      <div class="flex items-center gap-4">
+        <a href="/dashboard" class="hover:text-white transition">Dashboard</a>
+        <a href="/providers" class="hover:text-white transition">Marketplace</a>
+        <a href="/auth/passkey" class="hover:text-white transition">Passkeys</a>
+        <a href="/.well-known/x-agentgate.json" class="hover:text-white transition">API</a>
+        <a href="https://tempo.xyz" class="hover:text-white transition">Tempo</a>
+        <a href="https://privy.io" class="hover:text-white transition">Privy</a>
+      </div>
+    </div>
+  </footer>
+
 </body>
 </html>`);
 });
