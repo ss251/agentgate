@@ -961,11 +961,11 @@ app.get('/auth/passkey', (c) => {
     </div>
 
     <!-- Registered Credentials -->
-    ${passkeyCredentials.length > 0 ? \`
+    ${passkeyCredentials.length > 0 ? `
     <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
       <h2 class="text-xl font-semibold mb-4">Registered Passkey Accounts (${passkeyCredentials.length})</h2>
       <div class="space-y-3">${existingCreds}</div>
-    </div>\` : ''}
+    </div>` : ''}
 
     <div class="text-center text-gray-600 text-sm">
       <a href="/" class="text-blue-400 hover:underline">Home</a> ·
