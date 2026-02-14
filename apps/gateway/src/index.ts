@@ -1247,7 +1247,10 @@ app.get('/dashboard', async (c) => {
     <!-- Privy -->
     <div class="section">
       <div class="section-header">
-        <span class="section-title">Wallet Infrastructure — Privy</span>
+        <span class="section-title" style="display:flex;align-items:center;gap:8px;">
+          <img src="https://framerusercontent.com/images/oPqxoNxeHrQ9qgbjTUGuANdXdQ.png" alt="Privy" style="width:16px;height:16px;border-radius:3px;">
+          Wallet Infrastructure — Privy
+        </span>
         <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);border:1px solid rgba(200,255,0,0.2);padding:2px 8px;border-radius:4px;">server wallets</span>
       </div>
       <div class="privy-grid">
