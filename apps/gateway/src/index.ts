@@ -1109,7 +1109,7 @@ app.get('/dashboard', async (c) => {
     .map(
       (tx) => `
       <tr>
-        <td class="mono" style="font-size:12px;"><a href="https://explorer.moderato.tempo.xyz/tx/${tx.txHash}" target="_blank" style="color:var(--text-2);text-decoration:none;border-bottom:1px dashed var(--text-3);transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-2)'">${tx.txHash.slice(0, 10)}…${tx.txHash.slice(-6)}</a></td>
+        <td class="mono" style="font-size:12px;"><a href="https://explore.tempo.xyz/tx/${tx.txHash}" target="_blank" style="color:var(--text-2);text-decoration:none;border-bottom:1px dashed var(--text-3);transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-2)'">${tx.txHash.slice(0, 10)}…${tx.txHash.slice(-6)}</a></td>
         <td class="mono" style="font-size:12px;color:var(--text-2);">${tx.from.slice(0, 10)}…</td>
         <td style="color:var(--accent);font-weight:500;">${tx.amount} pathUSD</td>
         <td><span class="endpoint-tag">${tx.endpoint}</span></td>

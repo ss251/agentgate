@@ -2,7 +2,7 @@ export declare const tempoTestnet: {
     blockExplorers: {
         readonly default: {
             readonly name: "Tempo Explorer";
-            readonly url: "https://explorer.moderato.tempo.xyz";
+            readonly url: "https://explore.tempo.xyz";
         };
     };
     blockTime?: number | undefined | undefined;

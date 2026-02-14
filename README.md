@@ -292,7 +292,7 @@ Tempo has built-in smart accounts with session keys and spending limits, enablin
 - **Network:** Tempo Testnet (Moderato)
 - **Chain ID:** 42431
 - **RPC:** `https://rpc.moderato.tempo.xyz`
-- **Explorer:** `https://explorer.moderato.tempo.xyz`
+- **Explorer:** `https://explore.tempo.xyz`
 - **Token:** pathUSD (6 decimals) at `0x20c0000000000000000000000000000000000000`
 
 ## Testing

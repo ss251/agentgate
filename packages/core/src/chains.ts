@@ -8,7 +8,7 @@ export const tempoTestnet = defineChain({
     default: { http: ['https://rpc.moderato.tempo.xyz'] },
   },
   blockExplorers: {
-    default: { name: 'Tempo Explorer', url: 'https://explorer.moderato.tempo.xyz' },
+    default: { name: 'Tempo Explorer', url: 'https://explore.tempo.xyz' },
   },
   testnet: true,
 });

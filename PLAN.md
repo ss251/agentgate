@@ -177,7 +177,7 @@ tempo-hackathon/
 ## 🔗 Tempo Testnet Details
 - **Chain ID**: 42431
 - **RPC**: `https://rpc.moderato.tempo.xyz`
-- **Explorer**: `https://explorer.moderato.tempo.xyz`
+- **Explorer**: `https://explore.tempo.xyz`
 - **Faucet**: `https://faucet.tempo.xyz`
 - **Stablecoins**: pathUSD, AlphaUSD, BetaUSD, ThetaUSD
 - **Fee token**: Any TIP-20 stablecoin (no native gas token!)
