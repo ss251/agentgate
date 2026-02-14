@@ -9,7 +9,7 @@ import {
   type StablecoinSymbol,
   type PaymentRequirement,
   tempoTestnet,
-} from '@agentgate/core';
+} from '@tempo-agentgate/core';
 
 export interface EndpointPricing {
   amount: string;       // human-readable, e.g. "0.01"
@@ -148,4 +148,4 @@ export function paywall(options: PaywallOptions): MiddlewareHandler {
   });
 }
 
-export type { PaymentRequirement, PaymentVerification } from '@agentgate/core';
+export type { PaymentRequirement, PaymentVerification } from '@tempo-agentgate/core';

@@ -1,5 +1,5 @@
 {
-  "name": "@agentgate/middleware",
+  "name": "@tempo-agentgate/middleware",
   "version": "0.1.0",
   "description": "Hono middleware that adds HTTP 402 paywall to API endpoints — verify on-chain TIP-20 payments on Tempo",
   "type": "module",
@@ -23,7 +23,7 @@
     "url": "https://github.com/thescoho/agentgate"
   },
   "dependencies": {
-    "@agentgate/core": "^0.1.0"
+    "@tempo-agentgate/core": "^0.1.0"
   },
   "peerDependencies": {
     "hono": ">=4.0.0",

@@ -1,5 +1,5 @@
 {
-  "name": "@agentgate/sdk",
+  "name": "@tempo-agentgate/sdk",
   "version": "0.1.0",
   "description": "SDK for AI agents to auto-pay HTTP 402 APIs with on-chain TIP-20 transfers on Tempo",
   "type": "module",
@@ -23,7 +23,7 @@
     "url": "https://github.com/thescoho/agentgate"
   },
   "dependencies": {
-    "@agentgate/core": "^0.1.0"
+    "@tempo-agentgate/core": "^0.1.0"
   },
   "peerDependencies": {
     "viem": ">=2.0.0"

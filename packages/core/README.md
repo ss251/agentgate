@@ -1,11 +1,11 @@
-# @agentgate/core
+# @tempo-agentgate/core
 
 Core types, chain definitions, token addresses, and payment verification for **AgentGate** — the HTTP 402 payment protocol for AI agents on [Tempo](https://tempo.xyz).
 
 ## Install
 
 ```bash
-npm install @agentgate/core viem
+npm install @tempo-agentgate/core viem
 ```
 
 ## Usage
@@ -17,7 +17,7 @@ import {
   verifyPayment,
   buildPaymentRequirement,
   ERC20_ABI,
-} from '@agentgate/core';
+} from '@tempo-agentgate/core';
 
 // Build a 402 payment requirement
 const requirement = buildPaymentRequirement({

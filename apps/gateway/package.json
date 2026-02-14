@@ -1,5 +1,5 @@
 {
-  "name": "@agentgate/gateway",
+  "name": "@tempo-agentgate/gateway",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -7,7 +7,7 @@
     "start": "bun run src/index.ts"
   },
   "dependencies": {
-    "@agentgate/core": "workspace:*",
-    "@agentgate/middleware": "workspace:*"
+    "@tempo-agentgate/core": "workspace:*",
+    "@tempo-agentgate/middleware": "workspace:*"
   }
 }

@@ -81,7 +81,7 @@ bun run apps/gateway/src/index.ts
 ## SDK Usage (Agent Side)
 
 ```typescript
-import { AgentGateClient } from '@agentgate/sdk';
+import { AgentGateClient } from '@tempo-agentgate/sdk';
 
 const agent = new AgentGateClient({
   privateKey: '0x...',  // Agent's private key (funded with pathUSD)
@@ -124,7 +124,7 @@ const agent = new AgentGateClient({
 
 ```typescript
 import { Hono } from 'hono';
-import { paywall } from '@agentgate/middleware';
+import { paywall } from '@tempo-agentgate/middleware';
 
 const app = new Hono();
 

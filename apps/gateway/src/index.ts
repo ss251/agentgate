@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { paywall } from '@agentgate/middleware';
-import { STABLECOINS } from '@agentgate/core';
+import { paywall } from '@tempo-agentgate/middleware';
+import { STABLECOINS } from '@tempo-agentgate/core';
 import { parse as parseHTML } from 'node-html-parser';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { createPublicClient, http, formatUnits } from 'viem';
-import { tempoTestnet } from '@agentgate/core';
+import { tempoTestnet } from '@tempo-agentgate/core';
 import type { Address, Hex } from 'viem';
 
 // ─── Config ──────────────────────────────────────────────────────

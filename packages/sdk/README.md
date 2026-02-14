@@ -1,17 +1,17 @@
-# @agentgate/sdk
+# @tempo-agentgate/sdk
 
 SDK for AI agents to auto-pay HTTP 402 APIs with on-chain TIP-20 transfers on [Tempo](https://tempo.xyz).
 
 ## Install
 
 ```bash
-npm install @agentgate/sdk @agentgate/core viem
+npm install @tempo-agentgate/sdk @tempo-agentgate/core viem
 ```
 
 ## Usage
 
 ```typescript
-import { AgentGateClient } from '@agentgate/sdk';
+import { AgentGateClient } from '@tempo-agentgate/sdk';
 
 const client = new AgentGateClient({
   privateKey: '0xYourPrivateKey',

@@ -9,7 +9,7 @@ import {
   type Chain,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { tempoTestnet, ERC20_ABI, STABLECOINS, type StablecoinSymbol } from '@agentgate/core';
+import { tempoTestnet, ERC20_ABI, STABLECOINS, type StablecoinSymbol } from '@tempo-agentgate/core';
 
 export interface AgentWalletConfig {
   privateKey: Hex;
@@ -231,4 +231,4 @@ export class AgentGateClient {
   }
 }
 
-export { tempoTestnet, tempoMainnet } from '@agentgate/core';
+export { tempoTestnet, tempoMainnet } from '@tempo-agentgate/core';

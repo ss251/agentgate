@@ -84,7 +84,7 @@ POST /registry/services
 
 ### 3. Agent SDK (Client)
 ```typescript
-import { AgentGateClient } from '@agentgate/sdk';
+import { AgentGateClient } from '@tempo-agentgate/sdk';
 
 const agent = new AgentGateClient({
   privyAppId: '...',

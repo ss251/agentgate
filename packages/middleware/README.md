@@ -1,18 +1,18 @@
-# @agentgate/middleware
+# @tempo-agentgate/middleware
 
 Hono middleware that adds HTTP 402 paywall to API endpoints — verify on-chain TIP-20 payments on [Tempo](https://tempo.xyz).
 
 ## Install
 
 ```bash
-npm install @agentgate/middleware @agentgate/core hono viem
+npm install @tempo-agentgate/middleware @tempo-agentgate/core hono viem
 ```
 
 ## Usage
 
 ```typescript
 import { Hono } from 'hono';
-import { paywall } from '@agentgate/middleware';
+import { paywall } from '@tempo-agentgate/middleware';
 
 const app = new Hono();
 

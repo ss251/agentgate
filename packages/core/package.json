@@ -1,5 +1,5 @@
 {
-  "name": "@agentgate/core",
+  "name": "@tempo-agentgate/core",
   "version": "0.1.0",
   "description": "Core types, chain definitions, token addresses, and payment verification for AgentGate — the HTTP 402 payment protocol for AI agents on Tempo",
   "type": "module",
