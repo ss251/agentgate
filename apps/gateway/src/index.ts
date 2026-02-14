@@ -38,6 +38,7 @@ const EXECUTION_TIMEOUT_MS = 10_000;
 const MAX_HTML_SIZE = 1024 * 1024; // 1MB for deploy
 const SCRAPE_TIMEOUT_MS = 10_000;
 const MAX_SCRAPE_RESPONSE = 500 * 1024; // 500KB
+const GROQ_API_KEY = process.env.GROQ_API_KEY ?? '';
 
 // Dangerous shell patterns — basic blocklist (not a sandbox!)
 const SHELL_BLOCKLIST = [
@@ -106,6 +107,7 @@ app.get('/.well-known/x-agentgate.json', (c) =>
     token: { symbol: 'pathUSD', address: STABLECOINS.pathUSD.address, decimals: 6 },
     recipient: PROVIDER_ADDRESS,
     endpoints: [
+      { method: 'POST', path: '/api/chat', price: '0.005', description: 'LLM Chat — Groq-powered fast inference (llama-3.3-70b)' },
       { method: 'POST', path: '/api/execute', price: '0.01', description: 'Code Execution — run TypeScript, Python, or shell code' },
       { method: 'POST', path: '/api/scrape', price: '0.005', description: 'Web Scraping — fetch and extract readable content from a URL' },
       { method: 'POST', path: '/api/deploy', price: '0.05', description: 'Site Deployment — deploy HTML and get a live URL' },
@@ -149,6 +151,7 @@ app.use(
     recipientAddress: PROVIDER_ADDRESS,
     token: 'pathUSD',
     pricing: {
+      'POST /api/chat': { amount: '0.005', description: 'LLM Chat (Groq)' },
       'POST /api/execute': { amount: '0.01', description: 'Code Execution' },
       'POST /api/scrape': { amount: '0.005', description: 'Web Scraping' },
       'POST /api/deploy': { amount: '0.05', description: 'Site Deployment' },
@@ -171,6 +174,53 @@ app.use(
     },
   })
 );
+
+// ─── LLM Chat Service (Groq) ────────────────────────────────────
+app.post('/api/chat', async (c) => {
+  if (!GROQ_API_KEY) {
+    return c.json({ error: 'LLM service not configured', code: 'LLM_NOT_CONFIGURED' }, 503);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const { messages, prompt, model, max_tokens, temperature } = body;
+
+  // Support both OpenAI-style { messages } and simple { prompt }
+  const chatMessages = messages ?? (prompt ? [{ role: 'user', content: prompt }] : null);
+  if (!chatMessages || !Array.isArray(chatMessages) || chatMessages.length === 0) {
+    return c.json({ error: 'Provide "messages" array or "prompt" string', code: 'INVALID_INPUT' }, 400);
+  }
+
+  try {
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model ?? 'llama-3.3-70b-versatile',
+        messages: chatMessages,
+        max_tokens: Math.min(max_tokens ?? 1024, 4096),
+        temperature: temperature ?? 0.7,
+      }),
+    });
+
+    if (!groqRes.ok) {
+      const err = await groqRes.text();
+      return c.json({ error: 'LLM request failed', details: err, code: 'LLM_ERROR' }, 502);
+    }
+
+    const data = await groqRes.json() as any;
+    return c.json({
+      response: data.choices?.[0]?.message?.content ?? '',
+      model: data.model,
+      usage: data.usage,
+      provider: 'groq',
+    });
+  } catch (err: any) {
+    return c.json({ error: `LLM error: ${err.message}`, code: 'LLM_ERROR' }, 500);
+  }
+});
 
 // ─── Code Execution Service ─────────────────────────────────────
 app.post('/api/execute', async (c) => {
