@@ -71,6 +71,20 @@ const stats = {
   recentTransactions: [] as TransactionLog[],
 };
 
+// ─── Provider Registry ───────────────────────────────────────────
+interface RegisteredProvider {
+  id: string;
+  name: string;
+  endpoint: string;
+  price: string;
+  description: string;
+  category: string;
+  walletAddress: string;
+  registeredAt: string;
+}
+
+const registeredProviders: RegisteredProvider[] = [];
+
 // ─── App ─────────────────────────────────────────────────────────
 const app = new Hono();
 
@@ -220,6 +234,34 @@ app.get('/api/wallets/:walletId/balance', async (c) => {
   } catch (err: any) {
     return c.json({ error: `Balance check failed: ${err.message}` }, 500);
   }
+});
+
+// ─── Provider Registration (Free) ────────────────────────────────
+app.post('/api/providers/register', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { name, endpoint, price, description, category, walletAddress } = body;
+
+  if (!name || !endpoint || !price || !walletAddress) {
+    return c.json({ error: 'Missing required fields: name, endpoint, price, walletAddress' }, 400);
+  }
+
+  const provider: RegisteredProvider = {
+    id: crypto.randomUUID().slice(0, 8),
+    name,
+    endpoint,
+    price,
+    description: description ?? '',
+    category: category ?? 'general',
+    walletAddress,
+    registeredAt: new Date().toISOString(),
+  };
+
+  registeredProviders.push(provider);
+  return c.json({ provider, message: 'Provider registered successfully' }, 201);
+});
+
+app.get('/api/providers', (c) => {
+  return c.json({ providers: registeredProviders, count: registeredProviders.length });
 });
 
 // ─── Paywall Middleware ──────────────────────────────────────────
@@ -589,6 +631,127 @@ app.get('/sites/:deployId/*', (c) => {
   return new Response(content);
 });
 
+// ─── Provider Registry Page ──────────────────────────────────────
+app.get('/providers', (c) => {
+  const providerCards = registeredProviders.map(p => `
+    <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-lg">${p.name}</h3>
+        <span class="text-green-400 font-mono text-sm">${p.price} pathUSD</span>
+      </div>
+      <p class="text-gray-400 text-sm mb-2">${p.description}</p>
+      <div class="flex items-center gap-2 text-xs text-gray-500">
+        <span class="bg-purple-900 text-purple-300 px-2 py-0.5 rounded">${p.category}</span>
+        <span class="font-mono">${p.endpoint}</span>
+      </div>
+      <div class="text-xs text-gray-600 mt-2 font-mono">Wallet: ${p.walletAddress.slice(0, 10)}… · Registered ${new Date(p.registeredAt).toLocaleDateString()}</div>
+    </div>
+  `).join('');
+
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentGate — Provider Marketplace</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+  <div class="max-w-5xl mx-auto px-6 py-10">
+    <div class="flex items-center gap-4 mb-8">
+      <div class="text-4xl">🏪</div>
+      <div>
+        <h1 class="text-3xl font-bold">Provider Marketplace</h1>
+        <p class="text-gray-400">Register your API and start earning pathUSD from AI agents</p>
+      </div>
+      <a href="/" class="ml-auto text-blue-400 hover:underline text-sm">← Home</a>
+    </div>
+
+    <!-- Registration Form -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
+      <h2 class="text-xl font-semibold mb-4">Register Your API</h2>
+      <form id="registerForm" class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Service Name *</label>
+          <input name="name" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="My LLM API">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Endpoint URL *</label>
+          <input name="endpoint" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="https://my-api.com/inference">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Price (pathUSD) *</label>
+          <input name="price" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="0.01">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Category</label>
+          <select name="category" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
+            <option value="inference">🧠 Inference</option>
+            <option value="data">📊 Data</option>
+            <option value="compute">⚡ Compute</option>
+            <option value="storage">💾 Storage</option>
+            <option value="other">🔧 Other</option>
+          </select>
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm text-gray-400 mb-1">Description</label>
+          <input name="description" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="GPT-4 proxy with function calling support">
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm text-gray-400 mb-1">Wallet Address (receives payments) *</label>
+          <input name="walletAddress" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none" placeholder="0x...">
+        </div>
+        <div class="md:col-span-2">
+          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition">Register Service →</button>
+          <span id="formStatus" class="ml-3 text-sm"></span>
+        </div>
+      </form>
+    </div>
+
+    <!-- Registered Providers -->
+    <h2 class="text-xl font-semibold mb-4">Registered Services (${registeredProviders.length})</h2>
+    ${registeredProviders.length === 0
+      ? '<div class="bg-gray-900 rounded-xl border border-gray-800 p-8 text-center text-gray-500">No external providers registered yet. Be the first!</div>'
+      : `<div class="grid md:grid-cols-2 gap-4">${providerCards}</div>`}
+
+    <div class="mt-8 text-center text-gray-600 text-sm">
+      <a href="/" class="text-blue-400 hover:underline">Home</a> ·
+      <a href="/dashboard" class="text-blue-400 hover:underline">Dashboard</a> ·
+      <a href="/.well-known/x-agentgate.json" class="text-blue-400 hover:underline">Discovery API</a>
+    </div>
+  </div>
+  <script>
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = Object.fromEntries(new FormData(form));
+      const status = document.getElementById('formStatus');
+      status.textContent = 'Registering...';
+      status.className = 'ml-3 text-sm text-yellow-400';
+      try {
+        const res = await fetch('/api/providers/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (res.ok) {
+          status.textContent = '✓ Registered! Reloading...';
+          status.className = 'ml-3 text-sm text-green-400';
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          const err = await res.json();
+          status.textContent = '✗ ' + (err.error || 'Failed');
+          status.className = 'ml-3 text-sm text-red-400';
+        }
+      } catch (err) {
+        status.textContent = '✗ Network error';
+        status.className = 'ml-3 text-sm text-red-400';
+      }
+    });
+  </script>
+</body>
+</html>`);
+});
+
 // ─── Dashboard ───────────────────────────────────────────────────
 app.get('/dashboard', async (c) => {
   // Try to get provider balance
@@ -664,12 +827,48 @@ app.get('/dashboard', async (c) => {
       </div>
     </div>
 
+    <!-- Privy Wallet Infrastructure -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 mb-8">
+      <div class="px-5 py-4 border-b border-gray-800 flex items-center gap-2">
+        <span class="text-lg">🔐</span>
+        <h2 class="text-lg font-semibold">Powered by Privy</h2>
+        <span class="ml-auto bg-purple-900 text-purple-300 px-2 py-0.5 rounded text-xs">Server Wallets</span>
+      </div>
+      <div class="p-5 grid md:grid-cols-3 gap-4">
+        <div class="text-center">
+          <div class="text-2xl font-bold text-purple-400">0-click</div>
+          <div class="text-gray-400 text-sm mt-1">Wallet creation for agents</div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-bold text-purple-400">No seed phrases</div>
+          <div class="text-gray-400 text-sm mt-1">Privy manages keys securely</div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-bold text-purple-400">Fee sponsored</div>
+          <div class="text-gray-400 text-sm mt-1">Agents only need pathUSD</div>
+        </div>
+      </div>
+      <div class="px-5 pb-4 text-sm text-gray-500">
+        POST <code class="text-gray-400">/api/wallets/create</code> → instant Privy server wallet · 
+        GET <code class="text-gray-400">/api/wallets/:id/balance</code> → on-chain balance check
+      </div>
+    </div>
+
     <!-- Endpoints -->
     <div class="bg-gray-900 rounded-xl border border-gray-800 mb-8">
       <div class="px-5 py-4 border-b border-gray-800">
         <h2 class="text-lg font-semibold">Available Endpoints</h2>
       </div>
       <div class="divide-y divide-gray-800">
+        <div class="px-5 py-4 flex items-center justify-between">
+          <div>
+            <span class="bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded text-xs font-mono mr-2">POST</span>
+            <span class="font-mono">/api/chat</span>
+            <span class="text-gray-400 ml-3 text-sm">LLM Chat — Groq llama-3.3-70b</span>
+            <span class="ml-2 bg-green-900 text-green-300 px-1.5 py-0.5 rounded text-xs">⭐ Featured</span>
+          </div>
+          <span class="text-green-400 font-mono">0.005 pathUSD</span>
+        </div>
         <div class="px-5 py-4 flex items-center justify-between">
           <div>
             <span class="bg-yellow-900 text-yellow-300 px-2 py-0.5 rounded text-xs font-mono mr-2">POST</span>
@@ -697,6 +896,25 @@ app.get('/dashboard', async (c) => {
       </div>
     </div>
 
+    <!-- Registered External Providers -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 mb-8">
+      <div class="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">🏪 External Providers</h2>
+        <a href="/providers" class="text-blue-400 hover:underline text-sm">Register yours →</a>
+      </div>
+      ${registeredProviders.length === 0
+        ? '<div class="px-5 py-6 text-center text-gray-500">No external providers yet. <a href="/providers" class="text-blue-400 hover:underline">Register your API</a> to start earning.</div>'
+        : `<div class="divide-y divide-gray-800">${registeredProviders.slice(0, 5).map(p => `
+          <div class="px-5 py-3 flex items-center justify-between">
+            <div>
+              <span class="font-medium">${p.name}</span>
+              <span class="text-gray-400 ml-2 text-sm">${p.description}</span>
+              <span class="ml-2 bg-purple-900 text-purple-300 px-1.5 py-0.5 rounded text-xs">${p.category}</span>
+            </div>
+            <span class="text-green-400 font-mono text-sm">${p.price} pathUSD</span>
+          </div>`).join('')}</div>`}
+    </div>
+
     <!-- Recent Transactions -->
     <div class="bg-gray-900 rounded-xl border border-gray-800">
       <div class="px-5 py-4 border-b border-gray-800">
@@ -719,9 +937,10 @@ app.get('/dashboard', async (c) => {
     </div>
 
     <div class="mt-8 text-center text-gray-600 text-sm">
-      AgentGate — Built on <a href="https://tempo.xyz" class="text-blue-400 hover:underline">Tempo</a> | 
-      Chain ID: 42431 | 
-      <a href="/.well-known/x-agentgate.json" class="text-blue-400 hover:underline">Service Discovery</a> |
+      AgentGate — Built on <a href="https://tempo.xyz" class="text-blue-400 hover:underline">Tempo</a> · 
+      Wallets by <a href="https://privy.io" class="text-purple-400 hover:underline">Privy</a> · 
+      <a href="/providers" class="text-blue-400 hover:underline">Provider Marketplace</a> ·
+      <a href="/.well-known/x-agentgate.json" class="text-blue-400 hover:underline">Discovery</a> ·
       <a href="/api/health" class="text-blue-400 hover:underline">Health</a>
     </div>
   </div>
@@ -741,11 +960,12 @@ app.get('/', (c) => {
       docs: '/.well-known/x-agentgate.json',
       dashboard: '/dashboard',
       endpoints: {
+        'POST /api/chat': '0.005 pathUSD — LLM Chat (Groq llama-3.3-70b)',
         'POST /api/execute': '0.01 pathUSD — Code Execution',
         'POST /api/scrape': '0.005 pathUSD — Web Scraping',
         'POST /api/deploy': '0.05 pathUSD — Site Deployment',
       },
-      free: ['GET /', 'GET /api/health', 'GET /api/sites', 'GET /dashboard', 'GET /.well-known/x-agentgate.json'],
+      free: ['GET /', 'GET /api/health', 'GET /api/sites', 'GET /api/providers', 'GET /dashboard', 'GET /providers', 'GET /.well-known/x-agentgate.json'],
     });
   }
 
@@ -755,14 +975,15 @@ app.get('/', (c) => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AgentGate — AI Agent Payment Gateway on Tempo</title>
-  <meta name="description" content="Pay-per-call API gateway for AI agents using stablecoins on Tempo blockchain. HTTP 402 powered.">
+  <title>AgentGate — Monetize Your APIs with Crypto Payments</title>
+  <meta name="description" content="Two-sided marketplace: API providers monetize with one line of middleware, AI agents pay with stablecoins on Tempo. Powered by Privy server wallets.">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
     .float { animation: float 3s ease-in-out infinite; }
     .gradient-text { background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .glow { box-shadow: 0 0 40px rgba(96, 165, 250, 0.15); }
+    .privy-glow { box-shadow: 0 0 40px rgba(167, 139, 250, 0.15); }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
@@ -770,55 +991,76 @@ app.get('/', (c) => {
   <div class="max-w-5xl mx-auto px-6 pt-20 pb-16 text-center">
     <div class="text-6xl mb-6 float">🚪</div>
     <h1 class="text-5xl md:text-6xl font-bold mb-4">
-      <span class="gradient-text">AgentGate</span>
+      <span class="gradient-text">Monetize Your APIs</span><br>
+      <span class="text-3xl md:text-4xl text-gray-300">with Crypto Payments</span>
     </h1>
-    <p class="text-xl md:text-2xl text-gray-400 mb-2">Pay-per-call API gateway for AI agents</p>
-    <p class="text-lg text-gray-500 mb-10">Stablecoin micropayments on <a href="https://tempo.xyz" class="text-blue-400 hover:underline">Tempo</a> via HTTP 402</p>
+    <p class="text-xl text-gray-400 mb-2 max-w-2xl mx-auto">The two-sided marketplace where <strong class="text-white">API providers</strong> earn pathUSD and <strong class="text-white">AI agents</strong> pay per call — powered by HTTP 402</p>
+    <p class="text-lg text-gray-500 mb-10">Bring Your Own Backend · One line of middleware · Instant stablecoin payments</p>
     <div class="flex gap-4 justify-center flex-wrap">
-      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition">Live Dashboard →</a>
+      <a href="/providers" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition">Register Your API →</a>
+      <a href="/dashboard" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition">Live Dashboard</a>
       <a href="https://github.com/ss251/agentgate" class="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition border border-gray-700">GitHub ↗</a>
-      <a href="/.well-known/x-agentgate.json" class="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition border border-gray-700">Discovery API</a>
     </div>
   </div>
 
-  <!-- How It Works -->
+  <!-- How It Works — Two Sides -->
   <div class="max-w-5xl mx-auto px-6 pb-16">
     <h2 class="text-3xl font-bold text-center mb-10">How It Works</h2>
-    <div class="grid md:grid-cols-4 gap-6">
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 glow text-center">
-        <div class="text-3xl mb-3">🤖</div>
-        <h3 class="font-semibold mb-2">1. Agent Requests</h3>
-        <p class="text-gray-400 text-sm">AI agent calls a paid API endpoint</p>
+    <div class="grid md:grid-cols-2 gap-8">
+      <!-- Provider Side -->
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        <h3 class="text-xl font-bold mb-4 text-purple-400">🏪 For Providers</h3>
+        <p class="text-gray-400 text-sm mb-4">Monetize any API with one line of middleware</p>
+        <div class="space-y-3">
+          <div class="flex items-start gap-3"><span class="bg-purple-900 text-purple-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">1</span><div><div class="font-medium">Add paywall() middleware</div><div class="text-gray-400 text-sm">Works with any Hono app — one import, one line</div></div></div>
+          <div class="flex items-start gap-3"><span class="bg-purple-900 text-purple-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">2</span><div><div class="font-medium">Set your prices</div><div class="text-gray-400 text-sm">Per-endpoint pricing in pathUSD stablecoins</div></div></div>
+          <div class="flex items-start gap-3"><span class="bg-purple-900 text-purple-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">3</span><div><div class="font-medium">Get paid on every call</div><div class="text-gray-400 text-sm">Payments go directly to your wallet on Tempo</div></div></div>
+        </div>
       </div>
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 glow text-center">
-        <div class="text-3xl mb-3">💳</div>
-        <h3 class="font-semibold mb-2">2. Gets 402</h3>
-        <p class="text-gray-400 text-sm">Gateway returns payment requirements</p>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 glow text-center">
-        <div class="text-3xl mb-3">⛓️</div>
-        <h3 class="font-semibold mb-2">3. Pays On-Chain</h3>
-        <p class="text-gray-400 text-sm">Agent sends pathUSD on Tempo (~2s)</p>
-      </div>
-      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 glow text-center">
-        <div class="text-3xl mb-3">✅</div>
-        <h3 class="font-semibold mb-2">4. Gets Response</h3>
-        <p class="text-gray-400 text-sm">Payment verified, service delivered</p>
+      <!-- Agent Side -->
+      <div class="bg-gray-900 rounded-xl border border-gray-800 p-6">
+        <h3 class="text-xl font-bold mb-4 text-blue-400">🤖 For Agents</h3>
+        <p class="text-gray-400 text-sm mb-4">Discover and pay for APIs automatically</p>
+        <div class="space-y-3">
+          <div class="flex items-start gap-3"><span class="bg-blue-900 text-blue-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">1</span><div><div class="font-medium">Discover services</div><div class="text-gray-400 text-sm">Auto-discover via .well-known/x-agentgate.json</div></div></div>
+          <div class="flex items-start gap-3"><span class="bg-blue-900 text-blue-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">2</span><div><div class="font-medium">Pay with pathUSD</div><div class="text-gray-400 text-sm">SDK auto-handles 402 → pay → retry flow</div></div></div>
+          <div class="flex items-start gap-3"><span class="bg-blue-900 text-blue-300 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0">3</span><div><div class="font-medium">Get results</div><div class="text-gray-400 text-sm">On-chain verified, no API keys needed</div></div></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Endpoints -->
+  <!-- Live Services -->
   <div class="max-w-5xl mx-auto px-6 pb-16">
-    <h2 class="text-3xl font-bold text-center mb-10">Available Services</h2>
-    <div class="grid md:grid-cols-3 gap-6">
+    <h2 class="text-3xl font-bold text-center mb-3">Live Services</h2>
+    <p class="text-gray-400 text-center mb-10">Try them now — real endpoints, real payments on Tempo testnet</p>
+    <div class="grid md:grid-cols-2 gap-6">
+      <!-- Featured: Chat -->
+      <div class="bg-gray-900 rounded-xl p-6 border-2 border-purple-700 glow md:col-span-2">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <span class="text-3xl">🧠</span>
+            <div>
+              <h3 class="text-xl font-semibold">LLM Inference</h3>
+              <span class="text-gray-400 text-sm">Groq-powered llama-3.3-70b — blazing fast</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-green-400 font-mono text-lg">0.005 pathUSD</span>
+            <div class="text-xs text-gray-500">per request</div>
+          </div>
+        </div>
+        <p class="text-gray-400 text-sm mb-3">OpenAI-compatible chat completions API. Send messages or a simple prompt — get intelligent responses in milliseconds.</p>
+        <code class="text-xs text-purple-400 font-mono">POST /api/chat</code>
+        <span class="ml-2 bg-green-900 text-green-300 px-2 py-0.5 rounded text-xs">⭐ Featured</span>
+      </div>
       <div class="bg-gray-900 rounded-xl p-6 border border-gray-800">
         <div class="flex items-center justify-between mb-4">
           <span class="text-2xl">⚡</span>
           <span class="text-green-400 font-mono text-sm">0.01 pathUSD</span>
         </div>
         <h3 class="text-lg font-semibold mb-2">Code Execution</h3>
-        <p class="text-gray-400 text-sm mb-3">Run TypeScript, Python, or shell commands in a sandboxed environment</p>
+        <p class="text-gray-400 text-sm mb-3">Run TypeScript, Python, or shell in a sandboxed environment</p>
         <code class="text-xs text-gray-500 font-mono">POST /api/execute</code>
       </div>
       <div class="bg-gray-900 rounded-xl p-6 border border-gray-800">
@@ -839,52 +1081,168 @@ app.get('/', (c) => {
         <p class="text-gray-400 text-sm mb-3">Deploy HTML to a live URL instantly</p>
         <code class="text-xs text-gray-500 font-mono">POST /api/deploy</code>
       </div>
+      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 border-dashed flex flex-col items-center justify-center text-center">
+        <div class="text-3xl mb-2">➕</div>
+        <h3 class="text-lg font-semibold mb-1">Your API Here</h3>
+        <p class="text-gray-400 text-sm mb-3">Bring your own backend and start earning</p>
+        <a href="/providers" class="text-purple-400 hover:underline text-sm">Register now →</a>
+      </div>
     </div>
   </div>
 
-  <!-- Code Example -->
+  <!-- Powered by Privy -->
+  <div class="max-w-5xl mx-auto px-6 pb-16">
+    <div class="bg-gray-900 rounded-xl border border-purple-800 p-8 privy-glow">
+      <div class="text-center mb-6">
+        <h2 class="text-2xl font-bold mb-2">🔐 Powered by <span class="text-purple-400">Privy</span></h2>
+        <p class="text-gray-400">Server wallets for AI agents — no seed phrases, no complexity</p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-6 text-center">
+        <div>
+          <div class="text-3xl mb-2">⚡</div>
+          <h3 class="font-semibold mb-1">Instant Wallets</h3>
+          <p class="text-gray-400 text-sm">Create agent wallets with a single API call. No seed phrases, no key management.</p>
+        </div>
+        <div>
+          <div class="text-3xl mb-2">🛡️</div>
+          <h3 class="font-semibold mb-1">Secure Key Management</h3>
+          <p class="text-gray-400 text-sm">Privy manages private keys in secure enclaves. Your agents never touch raw keys.</p>
+        </div>
+        <div>
+          <div class="text-3xl mb-2">💸</div>
+          <h3 class="font-semibold mb-1">Fee Sponsorship</h3>
+          <p class="text-gray-400 text-sm">Automatic gas sponsorship — agents only need pathUSD, never native tokens.</p>
+        </div>
+      </div>
+      <div class="mt-6 text-center">
+        <code class="text-sm text-gray-500 bg-gray-800 px-4 py-2 rounded-lg">POST /api/wallets/create → { walletId, address } — that's it!</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- Built on Tempo -->
+  <div class="max-w-5xl mx-auto px-6 pb-16">
+    <div class="bg-gray-900 rounded-xl border border-blue-800 p-8 glow">
+      <div class="text-center mb-6">
+        <h2 class="text-2xl font-bold mb-2">⛓️ Built on <span class="text-blue-400">Tempo</span></h2>
+        <p class="text-gray-400">The chain purpose-built for agent payments</p>
+      </div>
+      <div class="grid md:grid-cols-4 gap-4 text-center">
+        <div>
+          <div class="text-xl font-bold text-blue-400">~2s</div>
+          <div class="text-gray-400 text-sm">Finality</div>
+        </div>
+        <div>
+          <div class="text-xl font-bold text-blue-400">$0</div>
+          <div class="text-gray-400 text-sm">Gas fees (sponsored)</div>
+        </div>
+        <div>
+          <div class="text-xl font-bold text-blue-400">pathUSD</div>
+          <div class="text-gray-400 text-sm">Stablecoin payments</div>
+        </div>
+        <div>
+          <div class="text-xl font-bold text-blue-400">TIP-20</div>
+          <div class="text-gray-400 text-sm">Native token standard</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bring Your Own API -->
+  <div class="max-w-5xl mx-auto px-6 pb-16">
+    <div class="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-xl border border-gray-800 p-8 text-center">
+      <h2 class="text-3xl font-bold mb-3">🔌 Bring Your Own Backend</h2>
+      <p class="text-gray-400 mb-6 max-w-2xl mx-auto">AgentGate isn't just a gateway — it's a platform. Any API provider can monetize their service with one line of middleware. LLM inference, data APIs, compute services — if you can serve HTTP, you can earn crypto.</p>
+      <div class="bg-gray-950 rounded-lg p-4 max-w-lg mx-auto mb-6 text-left">
+        <pre class="text-sm overflow-x-auto"><code class="text-purple-300">import { paywall } from '@tempo-agentgate/middleware';
+
+// That's it. Your API now accepts crypto payments.
+app.use('/api/*', paywall({
+  recipientAddress: '0xYourWallet',
+  token: 'pathUSD',
+  pricing: {
+    'POST /api/inference': { amount: '0.01' }
+  }
+}));</code></pre>
+      </div>
+      <a href="/providers" class="inline-block bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-medium transition">Register Your API on AgentGate →</a>
+    </div>
+  </div>
+
+  <!-- Code Examples -->
   <div class="max-w-5xl mx-auto px-6 pb-16">
     <h2 class="text-3xl font-bold text-center mb-10">For Developers</h2>
     <div class="grid md:grid-cols-2 gap-6">
       <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-800 text-sm text-gray-400">🤖 Agent (SDK)</div>
+        <div class="px-4 py-3 border-b border-gray-800 text-sm text-gray-400">🤖 Agent Side — Auto-pay with SDK</div>
         <pre class="p-4 text-sm overflow-x-auto"><code class="text-green-300">import { AgentGateClient } from '@tempo-agentgate/sdk';
 
+// Use Privy server wallet (recommended)
 const agent = new AgentGateClient({
-  privateKey: '0x...'
+  privyAppId: 'your-app-id',
+  privyAppSecret: 'your-secret',
+  walletId: 'privy-wallet-id',
 });
+
+// Or use raw private key
+// const agent = new AgentGateClient({ privateKey: '0x...' });
 
 // Auto: 402 → pay pathUSD → retry → result
 const res = await agent.fetch(
-  'https://gateway.example/api/execute',
+  '${BASE_URL}/api/chat',
   {
     method: 'POST',
     body: JSON.stringify({
-      code: 'console.log("hello")',
-      language: 'typescript'
+      prompt: 'Explain quantum computing'
     })
   }
 );</code></pre>
       </div>
       <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-800 text-sm text-gray-400">🏪 Provider (Middleware)</div>
-        <pre class="p-4 text-sm overflow-x-auto"><code class="text-purple-300">import { paywall } from '@tempo-agentgate/middleware';
+        <div class="px-4 py-3 border-b border-gray-800 text-sm text-gray-400">🏪 Provider Side — One line of middleware</div>
+        <pre class="p-4 text-sm overflow-x-auto"><code class="text-purple-300">import { Hono } from 'hono';
+import { paywall } from '@tempo-agentgate/middleware';
 
+const app = new Hono();
+
+// Add crypto payments to ANY endpoint
 app.use('/api/*', paywall({
-  provider: '0x...',
-  pricing: [
-    {
-      path: '/api/execute',
-      method: 'POST',
-      amount: '0.01',
-      description: 'Code execution'
+  recipientAddress: '0xYourWallet',
+  token: 'pathUSD',
+  pricing: {
+    'POST /api/generate': {
+      amount: '0.02',
+      description: 'Image generation'
     }
-  ]
-}));</code></pre>
+  }
+}));
+
+app.post('/api/generate', (c) =&gt;
+  c.json({ image: '...' })
+);</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- npm Packages -->
+  <div class="max-w-5xl mx-auto px-6 pb-16">
+    <h2 class="text-3xl font-bold text-center mb-10">npm Packages</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 text-center">
+        <div class="font-mono text-blue-400 mb-2">@tempo-agentgate/sdk</div>
+        <p class="text-gray-400 text-sm">Agent client with auto 402→pay→retry, Privy wallet support, batch calls</p>
+      </div>
+      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 text-center">
+        <div class="font-mono text-purple-400 mb-2">@tempo-agentgate/middleware</div>
+        <p class="text-gray-400 text-sm">Hono paywall() middleware — add crypto payments to any API in one line</p>
+      </div>
+      <div class="bg-gray-900 rounded-xl p-6 border border-gray-800 text-center">
+        <div class="font-mono text-green-400 mb-2">@tempo-agentgate/core</div>
+        <p class="text-gray-400 text-sm">Shared types, chain config, token addresses, payment verification</p>
       </div>
     </div>
     <div class="text-center mt-6">
-      <code class="text-gray-500 text-sm">npm install @tempo-agentgate/sdk @tempo-agentgate/middleware @tempo-agentgate/core</code>
+      <code class="text-gray-500 text-sm bg-gray-900 px-4 py-2 rounded-lg">bun add @tempo-agentgate/sdk @tempo-agentgate/middleware @tempo-agentgate/core</code>
     </div>
   </div>
 
@@ -893,18 +1251,20 @@ app.use('/api/*', paywall({
     <div class="bg-gray-900 rounded-xl border border-gray-800 p-8">
       <h2 class="text-2xl font-bold mb-6 text-center">Built With</h2>
       <div class="flex flex-wrap gap-3 justify-center">
+        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">⛓️ Tempo</span>
+        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">🔐 Privy</span>
         <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">⚡ Bun</span>
         <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">🔥 Hono</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">⛓️ Tempo Testnet</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">💰 pathUSD (TIP-20)</span>
-        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">🔗 viem</span>
         <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">📦 TypeScript</span>
+        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">💰 pathUSD</span>
+        <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">🔗 viem</span>
         <span class="bg-gray-800 px-4 py-2 rounded-lg text-sm">🧪 56 Tests</span>
       </div>
-      <div class="mt-6 grid md:grid-cols-3 gap-4 text-center text-sm text-gray-400">
-        <div><span class="text-white font-bold text-lg">3</span><br>npm packages published</div>
-        <div><span class="text-white font-bold text-lg">~2s</span><br>payment confirmation</div>
-        <div><span class="text-white font-bold text-lg">$0</span><br>gas fees (fee sponsorship)</div>
+      <div class="mt-6 grid md:grid-cols-4 gap-4 text-center text-sm text-gray-400">
+        <div><span class="text-white font-bold text-lg">3</span><br>npm packages</div>
+        <div><span class="text-white font-bold text-lg">~2s</span><br>payment finality</div>
+        <div><span class="text-white font-bold text-lg">$0</span><br>gas fees</div>
+        <div><span class="text-white font-bold text-lg">∞</span><br>providers welcome</div>
       </div>
     </div>
   </div>
@@ -913,8 +1273,11 @@ app.use('/api/*', paywall({
   <div class="max-w-5xl mx-auto px-6 pb-10 text-center text-gray-600 text-sm">
     Built for the <a href="https://canteenapp-tempo.notion.site/" class="text-blue-400 hover:underline">Canteen × Tempo Hackathon</a> · 
     Track 3: AI Agents & Automation · 
-    <a href="https://github.com/ss251/agentgate" class="text-blue-400 hover:underline">Source Code</a> · 
-    <a href="/dashboard" class="text-blue-400 hover:underline">Dashboard</a>
+    Wallets by <a href="https://privy.io" class="text-purple-400 hover:underline">Privy</a> · 
+    Payments on <a href="https://tempo.xyz" class="text-blue-400 hover:underline">Tempo</a> ·
+    <a href="https://github.com/ss251/agentgate" class="text-blue-400 hover:underline">Source</a> · 
+    <a href="/dashboard" class="text-blue-400 hover:underline">Dashboard</a> · 
+    <a href="/providers" class="text-blue-400 hover:underline">Marketplace</a>
   </div>
 </body>
 </html>`);

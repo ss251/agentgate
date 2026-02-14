@@ -3,22 +3,27 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Built with Bun](https://img.shields.io/badge/Built%20with-Bun-orange)](https://bun.sh)
 [![Tempo Network](https://img.shields.io/badge/Chain-Tempo%20Testnet-purple)](https://tempo.xyz)
+[![Powered by Privy](https://img.shields.io/badge/Wallets-Privy-blueviolet)](https://privy.io)
 
-**HTTP 402 Payment Protocol for AI Agents on Tempo**
+**Monetize Your APIs with Crypto Payments — Two-Sided Marketplace for Providers & AI Agents**
 
-AgentGate enables AI agents to discover and pay for API services using on-chain TIP-20 stablecoin transfers. When an agent hits a paid endpoint, it gets a `402 Payment Required` response, sends a pathUSD transfer on Tempo, and retries with the tx hash — all automatic.
+AgentGate is a pay-per-call API marketplace where **providers** monetize their APIs with one line of middleware and **AI agents** pay with stablecoins on Tempo via HTTP 402. Powered by [Privy](https://privy.io) server wallets and [Tempo](https://tempo.xyz) blockchain.
+
+> **🏪 Bring Your Own Backend** — Any API provider can add `paywall()` middleware to their Hono app and start earning pathUSD from AI agents. LLM inference, data APIs, compute services — if you serve HTTP, you can earn crypto.
 
 ## Why AgentGate?
 
-AI agents need to consume APIs — code execution, web scraping, deployments, and more. But how do they *pay* for these services?
+AI agents need to consume APIs — LLM inference, code execution, web scraping, and more. But how do they *pay* for these services? And how do providers *monetize* them for autonomous agents?
 
 Traditional approaches (API keys, subscriptions, OAuth) don't work for autonomous agents. AgentGate implements the [HTTP 402 Payment Required](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/402) standard with on-chain payments:
 
+- **🏪 Two-sided marketplace** — Providers earn, agents pay. Both sides are first-class.
+- **🔌 Bring Your Own Backend** — One line of middleware to monetize any API.
+- **🔐 Privy server wallets** — No seed phrases. Instant wallet creation for agents. Automatic fee sponsorship.
+- **⛓️ Built on Tempo** — ~2s finality, fee sponsorship, pathUSD stablecoin payments.
 - **🤖 Agent-native** — No API keys, no accounts. Just a wallet and pathUSD.
-- **⚡ Instant** — Pay-per-call with sub-second Tempo finality.
 - **🔍 Discoverable** — `.well-known/x-agentgate.json` lets agents find and price services automatically.
-- **🔒 Verifiable** — Every payment is an on-chain TIP-20 transfer. No trust required.
-- **💸 Micro-payments** — Pay $0.005 for a single scrape. No minimums.
+- **💸 Micro-payments** — Pay $0.005 for LLM inference. No minimums.
 
 Inspired by [Coinbase x402](https://github.com/coinbase/x402) and built on [Tempo](https://tempo.xyz).
 
@@ -38,7 +43,46 @@ Agent                    Gateway                  Tempo Chain
   │◄── 200 + result ───────│                          │
 ```
 
-## Architecture
+## Architecture — Two-Sided Marketplace
+
+```
+┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│   API Providers  │     │      AgentGate        │     │    AI Agents    │
+│                  │     │                        │     │                 │
+│ • LLM inference  │────▶│ • Service discovery    │◀────│ • Auto-discover │
+│ • Data APIs      │     │ • Payment verification │     │ • Auto-pay 402  │
+│ • Compute        │     │ • Provider registry    │     │ • Privy wallets │
+│ • Any HTTP API   │     │ • Revenue tracking     │     │ • SDK client    │
+│                  │     │                        │     │                 │
+│ paywall()        │     │   Tempo Blockchain     │     │ AgentGateClient │
+│ middleware       │     │   pathUSD stablecoins   │     │                 │
+└─────────────────┘     └──────────────────────┘     └─────────────────┘
+```
+
+## Provider Registration
+
+Providers can register their APIs on the AgentGate marketplace:
+
+```bash
+# Register a new service
+curl -X POST https://gateway-production-aa5c.up.railway.app/api/providers/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My LLM API",
+    "endpoint": "https://my-api.com/inference",
+    "price": "0.01",
+    "description": "GPT-4 proxy with function calling",
+    "category": "inference",
+    "walletAddress": "0xYourWallet"
+  }'
+
+# List all registered providers
+curl https://gateway-production-aa5c.up.railway.app/api/providers
+```
+
+Or use the web UI at [`/providers`](https://gateway-production-aa5c.up.railway.app/providers).
+
+## Project Structure
 
 ```
 agentgate/
@@ -72,11 +116,12 @@ bun run apps/gateway/src/index.ts
 
 | Endpoint | Price | Description |
 |----------|-------|-------------|
-| `POST /api/execute` | 0.01 pathUSD | Run TypeScript, Python, or shell code |
-| `POST /api/scrape` | 0.005 pathUSD | Fetch and extract content from URLs |
-| `POST /api/deploy` | 0.05 pathUSD | Deploy HTML and get a live URL |
+| `POST /api/chat` | 0.005 pathUSD | ⭐ **LLM Chat** — Groq-powered llama-3.3-70b inference |
+| `POST /api/execute` | 0.01 pathUSD | Code Execution — TypeScript, Python, or shell |
+| `POST /api/scrape` | 0.005 pathUSD | Web Scraping — fetch and extract content |
+| `POST /api/deploy` | 0.05 pathUSD | Site Deployment — deploy HTML to a live URL |
 
-**Free endpoints:** `/`, `/dashboard`, `/api/health`, `/api/sites`, `/.well-known/x-agentgate.json`
+**Free endpoints:** `/`, `/dashboard`, `/providers`, `/api/health`, `/api/sites`, `/api/providers`, `/.well-known/x-agentgate.json`
 
 ## SDK Usage (Agent Side)
 
