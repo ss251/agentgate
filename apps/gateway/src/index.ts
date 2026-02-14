@@ -1430,29 +1430,26 @@ app.get('/', (c) => {
         <div class="terminal-dot" style="background:#ff5f57;"></div>
         <div class="terminal-dot" style="background:#febc2e;"></div>
         <div class="terminal-dot" style="background:#28c840;"></div>
-        <span class="mono" style="margin-left:8px;font-size:12px;color:var(--text-3);">the 402 dance</span>
+        <span class="mono" style="margin-left:8px;font-size:12px;color:var(--text-3);">http 402 flow</span>
       </div>
-      <div class="terminal-body mono">
-<span class="comment"># 1. agent calls a paid endpoint</span>
-<span class="prompt">$</span> curl -X POST ${BASE_URL}/api/execute \\
-    -d '{"code": "console.log(42)", "language": "typescript"}'
+      <pre class="terminal-body mono" style="margin:0;"><span class="comment"># 1. agent calls a paid endpoint</span>
+<span class="prompt">$</span> curl -X POST /api/execute \\
+  -d '{"code": "console.log(42)"}'
 
-<span class="comment"># 2. gateway says: pay first</span>
+<span class="comment"># 2. gateway responds with payment instructions</span>
 <span class="status-402">HTTP/1.1 402 Payment Required</span>
 <span class="header">X-Payment-Amount: 0.01</span>
 <span class="header">X-Payment-Token: pathUSD</span>
-<span class="header">X-Payment-Recipient: ${PROVIDER_ADDRESS.slice(0, 20)}…</span>
-<span class="header">X-Payment-Memo: 0x7f3a…</span>
+<span class="header">X-Payment-Recipient: ${PROVIDER_ADDRESS.slice(0, 10)}…</span>
 
-<span class="comment"># 3. agent sends pathUSD on tempo (~2 seconds)</span>
-<span class="prompt">$</span> curl -X POST ${BASE_URL}/api/execute \\
-    -H <span class="string">"X-Payment: ${PROVIDER_ADDRESS.slice(0, 10)}…:0.01:pathUSD:0xdeadbeef…"</span> \\
-    -d '{"code": "console.log(42)", "language": "typescript"}'
+<span class="comment"># 3. agent pays pathUSD on Tempo (~2s finality)</span>
+<span class="prompt">$</span> curl -X POST /api/execute \\
+  -H <span class="string">"X-Payment: 0x00Df…:0.01:pathUSD:0xabc…def"</span> \\
+  -d '{"code": "console.log(42)"}'
 
-<span class="comment"># 4. payment verified on-chain → response returned</span>
+<span class="comment"># 4. payment verified on-chain, response returned</span>
 <span class="status-200">HTTP/1.1 200 OK</span>
-<span class="dim">{ "output": "42\\n", "exitCode": 0 }</span>
-      </div>
+<span class="dim">{ "output": "42\\n", "exitCode": 0 }</span></pre>
     </div>
   </section>
 
@@ -1613,7 +1610,7 @@ app.<span class="fn">post</span>(<span class="str">'/api/generate'</span>, (c) =
           <div><span style="font-size:14px;font-weight:500;">Tempo</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">~2s finality · $0 gas · pathUSD · passkeys</span></div>
         </a>
         <a href="https://privy.io" target="_blank" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
-          <img src="https://privy.io/favicon.ico" alt="Privy" style="width:24px;height:24px;border-radius:4px;">
+          <img src="https://framerusercontent.com/images/oPqxoNxeHrQ9qgbjTUGuANdXdQ.png" alt="Privy" style="width:24px;height:24px;border-radius:4px;">
           <div><span style="font-size:14px;font-weight:500;">Privy</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">server wallets · fee sponsorship</span></div>
         </a>
         <a href="https://viem.sh" target="_blank" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
