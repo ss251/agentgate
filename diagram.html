@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgentGate Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px; min-height: 100vh; }
+  h1 { text-align: center; font-size: 28px; margin-bottom: 8px; color: #fff; }
+  .subtitle { text-align: center; color: #888; font-size: 14px; margin-bottom: 40px; }
+  
+  .diagram { max-width: 1100px; margin: 0 auto; position: relative; }
+  
+  /* Flow Section */
+  .flow-section { margin-bottom: 48px; }
+  .flow-title { font-size: 16px; font-weight: 600; color: #a78bfa; margin-bottom: 16px; letter-spacing: 1px; text-transform: uppercase; }
+  
+  /* The main flow */
+  .flow-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  
+  .box {
+    border-radius: 12px;
+    padding: 16px 20px;
+    min-width: 140px;
+    text-align: center;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .box .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.6; margin-bottom: 4px; }
+  .box .name { font-size: 15px; font-weight: 600; }
+  .box .detail { font-size: 11px; opacity: 0.7; margin-top: 4px; }
+  
+  .agent { background: linear-gradient(135deg, #1e1b4b, #312e81); border: 1px solid #4338ca; }
+  .gateway { background: linear-gradient(135deg, #1a1a2e, #16213e); border: 1px solid #6366f1; min-width: 220px; }
+  .tempo { background: linear-gradient(135deg, #0f2027, #203a43); border: 1px solid #22d3ee; }
+  .service { background: linear-gradient(135deg, #1a0f0f, #2d1f1f); border: 1px solid #f97316; }
+  .privy { background: linear-gradient(135deg, #1a0f2e, #2d1f3e); border: 1px solid #a855f7; }
+  .aws { background: linear-gradient(135deg, #1a1a0f, #2d2d1f); border: 1px solid #eab308; }
+  .registry { background: linear-gradient(135deg, #0f1a1a, #1f2d2d); border: 1px solid #10b981; }
+  
+  .arrow {
+    color: #555;
+    font-size: 20px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .arrow .arrow-label { font-size: 9px; color: #888; white-space: nowrap; }
+  
+  /* Big flow diagram */
+  .main-flow {
+    background: #0f0f18;
+    border: 1px solid #1e1e30;
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 32px;
+  }
+  .main-flow h2 { font-size: 18px; margin-bottom: 24px; color: #fff; }
+  
+  .step-row { display: flex; align-items: stretch; gap: 0; margin-bottom: 0; }
+  .step {
+    flex: 1;
+    padding: 16px;
+    position: relative;
+    border-left: 2px solid #2a2a40;
+    padding-left: 24px;
+  }
+  .step:first-child { border-left: none; }
+  .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .step-num.req { background: #4338ca; }
+  .step-num.pay { background: #22d3ee; color: #000; }
+  .step-num.verify { background: #10b981; color: #000; }
+  .step-num.proxy { background: #f97316; color: #000; }
+  .step-num.respond { background: #a855f7; }
+  
+  .step h4 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .step p { font-size: 11px; color: #888; line-height: 1.5; }
+  .step code { background: #1a1a2e; padding: 2px 6px; border-radius: 4px; font-size: 10px; color: #a78bfa; }
+  
+  /* Components grid */
+  .components {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .component {
+    background: #0f0f18;
+    border: 1px solid #1e1e30;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .component h3 { font-size: 14px; margin-bottom: 8px; }
+  .component ul { list-style: none; }
+  .component li { font-size: 12px; color: #888; padding: 3px 0; }
+  .component li::before { content: '→ '; color: #555; }
+  .component .tech { display: inline-block; background: #1a1a2e; padding: 2px 8px; border-radius: 4px; font-size: 10px; color: #6366f1; margin-top: 8px; }
+  
+  /* Actor diagram */
+  .actors {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .actor-col {
+    flex: 1;
+    background: #0f0f18;
+    border: 1px solid #1e1e30;
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .actor-col h3 { font-size: 14px; margin-bottom: 4px; }
+  .actor-col .actor-sub { font-size: 11px; color: #666; margin-bottom: 12px; }
+  .actor-col ul { list-style: none; }
+  .actor-col li { font-size: 12px; color: #aaa; padding: 4px 0; border-bottom: 1px solid #1a1a2a; }
+  .actor-col li:last-child { border-bottom: none; }
+  .emoji { margin-right: 6px; }
+  
+  /* Tempo features */
+  .tempo-features {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .tempo-feat {
+    background: #0a1a1a;
+    border: 1px solid #134e4a;
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+  .tempo-feat .feat-icon { font-size: 24px; margin-bottom: 6px; }
+  .tempo-feat h4 { font-size: 12px; color: #22d3ee; margin-bottom: 4px; }
+  .tempo-feat p { font-size: 10px; color: #666; }
+</style>
+</head>
+<body>
+
+<h1>⚡ AgentGate</h1>
+<p class="subtitle">AI Agent Payment Gateway on Tempo — Pay for any service with a single HTTP request</p>
+
+<div class="diagram">
+
+  <!-- Main Payment Flow -->
+  <div class="main-flow">
+    <h2>🔄 Payment Flow (x402-style)</h2>
+    <div class="step-row">
+      <div class="step">
+        <div class="step-num req">1</div>
+        <h4>Agent → Gateway</h4>
+        <p>AI agent sends HTTP request to a service endpoint.<br><code>POST /api/inference</code><br>No payment attached yet.</p>
+      </div>
+      <div class="step">
+        <div class="step-num pay">2</div>
+        <h4>Gateway → 402</h4>
+        <p>Gateway checks: no payment found.<br>Returns <code>HTTP 402 Payment Required</code><br>with price, wallet address, token (pathUSD), and memo format.</p>
+      </div>
+      <div class="step">
+        <div class="step-num verify">3</div>
+        <h4>Agent Pays on Tempo</h4>
+        <p>Agent's Privy server wallet sends a <strong>TIP-20 transfer</strong> on Tempo.<br>Amount: $0.01 pathUSD<br>Memo: request hash for reconciliation.<br><em>Sub-second finality.</em></p>
+      </div>
+      <div class="step">
+        <div class="step-num proxy">4</div>
+        <h4>Agent Retries + Proof</h4>
+        <p>Agent re-sends the HTTP request with<br><code>X-Payment-Tx: 0xabc...</code> header.<br>Gateway verifies tx on Tempo (instant).<br>✅ Confirmed → proxies to real service.</p>
+      </div>
+      <div class="step">
+        <div class="step-num respond">5</div>
+        <h4>Service → Agent</h4>
+        <p>Real service processes the request.<br>Response flows back through gateway to agent.<br>Payment receipt in <code>X-Payment-Receipt</code> header.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three Actors -->
+  <div class="actors">
+    <div class="actor-col">
+      <h3>🤖 AI Agents (Buyers)</h3>
+      <div class="actor-sub">Consume services, pay per call</div>
+      <ul>
+        <li><span class="emoji">🔑</span> Privy server wallet (no seed phrases)</li>
+        <li><span class="emoji">💰</span> Funded with pathUSD from faucet/deposit</li>
+        <li><span class="emoji">📦</span> Uses AgentGate SDK for auto-pay</li>
+        <li><span class="emoji">🔁</span> Handles 402 → pay → retry automatically</li>
+        <li><span class="emoji">📝</span> Transfer memos for tracking</li>
+      </ul>
+    </div>
+    <div class="actor-col" style="border-color: #6366f1;">
+      <h3>⚡ AgentGate (Platform)</h3>
+      <div class="actor-sub">Payment gateway + service registry</div>
+      <ul>
+        <li><span class="emoji">🛡️</span> Hono payment middleware</li>
+        <li><span class="emoji">📋</span> Service registry (endpoints + pricing)</li>
+        <li><span class="emoji">✅</span> Tx verification via Tempo RPC</li>
+        <li><span class="emoji">🔀</span> Request proxy to real services</li>
+        <li><span class="emoji">📊</span> Analytics dashboard for providers</li>
+      </ul>
+    </div>
+    <div class="actor-col">
+      <h3>🏪 Service Providers (Sellers)</h3>
+      <div class="actor-sub">Register endpoints, earn stablecoins</div>
+      <ul>
+        <li><span class="emoji">📝</span> Register via dashboard or API</li>
+        <li><span class="emoji">💲</span> Set per-call pricing in pathUSD</li>
+        <li><span class="emoji">🌐</span> Any HTTP endpoint (AWS, Vercel, etc.)</li>
+        <li><span class="emoji">💸</span> Instant settlement on every call</li>
+        <li><span class="emoji">📈</span> View earnings + call analytics</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Tempo Features Used -->
+  <p class="flow-title">Tempo Features We Leverage</p>
+  <div class="tempo-features">
+    <div class="tempo-feat">
+      <div class="feat-icon">⚡</div>
+      <h4>Instant Finality</h4>
+      <p>Sub-second tx confirmation = verify payment in the same HTTP round-trip</p>
+    </div>
+    <div class="tempo-feat">
+      <div class="feat-icon">💵</div>
+      <h4>No Native Token</h4>
+      <p>Fees paid in pathUSD stablecoin — agents only need one token</p>
+    </div>
+    <div class="tempo-feat">
+      <div class="feat-icon">📝</div>
+      <h4>Transfer Memos</h4>
+      <p>32-byte memo per transfer = embed request hash for reconciliation</p>
+    </div>
+    <div class="tempo-feat">
+      <div class="feat-icon">🎁</div>
+      <h4>Fee Sponsorship</h4>
+      <p>Platform sponsors gas for agents — zero friction onboarding</p>
+    </div>
+  </div>
+
+  <!-- Components -->
+  <p class="flow-title">System Components</p>
+  <div class="components">
+    <div class="component">
+      <h3>🔧 Core Package</h3>
+      <ul>
+        <li>Payment types & interfaces</li>
+        <li>TIP-20 transfer verification</li>
+        <li>Memo encoding/decoding</li>
+        <li>Price calculation utils</li>
+      </ul>
+      <span class="tech">packages/core</span>
+    </div>
+    <div class="component">
+      <h3>🛡️ Hono Middleware</h3>
+      <ul>
+        <li>402 response generation</li>
+        <li>Payment header parsing</li>
+        <li>Tx verification on Tempo</li>
+        <li>Request proxying</li>
+      </ul>
+      <span class="tech">packages/middleware</span>
+    </div>
+    <div class="component">
+      <h3>🤖 Agent SDK</h3>
+      <ul>
+        <li>Auto 402 → pay → retry</li>
+        <li>Privy wallet integration</li>
+        <li>Balance management</li>
+        <li>Transaction history</li>
+      </ul>
+      <span class="tech">packages/sdk</span>
+    </div>
+    <div class="component">
+      <h3>⚡ Gateway Server</h3>
+      <ul>
+        <li>Service registry CRUD</li>
+        <li>Payment gateway routing</li>
+        <li>Provider auth (Privy)</li>
+        <li>Usage analytics</li>
+      </ul>
+      <span class="tech">apps/gateway — Bun + Hono</span>
+    </div>
+    <div class="component">
+      <h3>🎨 Dashboard</h3>
+      <ul>
+        <li>Provider service management</li>
+        <li>Earnings & tx history</li>
+        <li>Agent wallet funding</li>
+        <li>API key management</li>
+      </ul>
+      <span class="tech">apps/dashboard — Next.js</span>
+    </div>
+    <div class="component">
+      <h3>☁️ Demo Services (AWS)</h3>
+      <ul>
+        <li>LLM Inference proxy ($0.01/call)</li>
+        <li>Weather API ($0.001/call)</li>
+        <li>Static site deployer ($1.00)</li>
+        <li>Image generation ($0.05)</li>
+      </ul>
+      <span class="tech">apps/demo-services — AWS Lambda</span>
+    </div>
+  </div>
+
+  <!-- Data Flow -->
+  <div class="main-flow">
+    <h2>🗄️ Data Model</h2>
+    <div class="step-row" style="gap: 24px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 200px;">
+        <h4 style="color: #10b981; margin-bottom: 8px;">Services</h4>
+        <code style="display: block; font-size: 11px; line-height: 1.8; color: #888;">
+          id: string<br>
+          provider_wallet: address<br>
+          name: string<br>
+          endpoint_url: string<br>
+          price_per_call: string (USD)<br>
+          token: address (pathUSD)<br>
+          category: enum<br>
+          total_calls: number<br>
+          total_earned: string
+        </code>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <h4 style="color: #6366f1; margin-bottom: 8px;">Payments</h4>
+        <code style="display: block; font-size: 11px; line-height: 1.8; color: #888;">
+          tx_hash: string<br>
+          service_id: string<br>
+          agent_wallet: address<br>
+          provider_wallet: address<br>
+          amount: string<br>
+          memo: bytes32<br>
+          status: verified|failed<br>
+          created_at: timestamp
+        </code>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <h4 style="color: #a855f7; margin-bottom: 8px;">Agents</h4>
+        <code style="display: block; font-size: 11px; line-height: 1.8; color: #888;">
+          id: string (Privy user)<br>
+          wallet_id: string<br>
+          wallet_address: address<br>
+          balance_cached: string<br>
+          total_spent: string<br>
+          total_calls: number<br>
+          created_at: timestamp
+        </code>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
