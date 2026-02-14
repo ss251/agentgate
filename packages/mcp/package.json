@@ -1,0 +1,32 @@
+{
+  "name": "@tempo-agentgate/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for AgentGate — use AI agent paid endpoints from Claude Desktop, Cursor, Windsurf",
+  "type": "module",
+  "main": "./src/index.ts",
+  "bin": {
+    "agentgate-mcp": "./src/index.ts"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "scripts": {
+    "dev": "bun run src/index.ts"
+  },
+  "keywords": ["agentgate", "mcp", "model-context-protocol", "claude", "cursor", "ai-agent", "402"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ss251/agentgate"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@tempo-agentgate/core": "^0.1.0",
+    "@tempo-agentgate/sdk": "^0.1.0",
+    "zod": "3.25.3"
+  },
+  "peerDependencies": {
+    "viem": ">=2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3"
+  }
+}
