@@ -108,8 +108,8 @@ bun install
 # Start the gateway
 bun run apps/gateway/src/index.ts
 
-# Gateway runs on http://localhost:3402
-# Dashboard at http://localhost:3402/dashboard
+# Gateway runs on https://tempo-agentgategateway-production.up.railway.app
+# Dashboard at https://tempo-agentgategateway-production.up.railway.app/dashboard
 ```
 
 ## Services
@@ -133,10 +133,10 @@ const agent = new AgentGateClient({
 });
 
 // Discover available services
-const services = await agent.discover('http://localhost:3402');
+const services = await agent.discover('https://tempo-agentgategateway-production.up.railway.app');
 
 // Call a paid endpoint — payment is automatic!
-const res = await agent.fetch('http://localhost:3402/api/execute', {
+const res = await agent.fetch('https://tempo-agentgategateway-production.up.railway.app/api/execute', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ code: 'console.log(2 + 2)', language: 'typescript' }),
@@ -183,7 +183,7 @@ await agent.resolveAddress();
 
 // Everything else works the same — payments use Privy's API
 // with automatic fee sponsorship (no gas tokens needed!)
-const res = await agent.fetch('http://localhost:3402/api/execute', {
+const res = await agent.fetch('https://tempo-agentgategateway-production.up.railway.app/api/execute', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ code: 'console.log("hello")', language: 'typescript' }),
@@ -193,11 +193,11 @@ const res = await agent.fetch('http://localhost:3402/api/execute', {
 **Provision a new wallet via the gateway:**
 
 ```bash
-curl -X POST http://localhost:3402/api/wallets/create
+curl -X POST https://tempo-agentgategateway-production.up.railway.app/api/wallets/create
 # Returns: { "walletId": "...", "address": "0x..." }
 
 # Check balance:
-curl http://localhost:3402/api/wallets/<walletId>/balance
+curl https://tempo-agentgategateway-production.up.railway.app/api/wallets/<walletId>/balance
 ```
 
 ### Fee Sponsorship
@@ -258,7 +258,7 @@ The code execution endpoint (`/api/execute`) implements multiple layers of prote
 Agents discover services via the well-known endpoint:
 
 ```bash
-curl http://localhost:3402/.well-known/x-agentgate.json
+curl https://tempo-agentgategateway-production.up.railway.app/.well-known/x-agentgate.json
 ```
 
 ## Tempo-Native Features

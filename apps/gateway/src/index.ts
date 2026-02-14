@@ -878,17 +878,17 @@ app.get('/auth/passkey', (c) => {
 // ─── Provider Registry Page ──────────────────────────────────────
 app.get('/providers', (c) => {
   const providerCards = registeredProviders.map(p => `
-    <div class="bg-gray-900 rounded-xl p-5 border border-gray-800">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold text-lg">${p.name}</h3>
-        <span class="text-green-400 font-mono text-sm">${p.price} pathUSD</span>
+    <div style="padding:20px 24px;background:var(--surface);border:1px solid var(--border);border-radius:8px;transition:border-color 0.3s;" onmouseover="this.style.borderColor='#3d4d00'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+        <span style="font-size:15px;font-weight:500;">${p.name}</span>
+        <span class="mono" style="font-size:13px;color:var(--accent);">${p.price} pathUSD</span>
       </div>
-      <p class="text-gray-400 text-sm mb-2">${p.description}</p>
-      <div class="flex items-center gap-2 text-xs text-gray-500">
-        <span class="bg-purple-900 text-purple-300 px-2 py-0.5 rounded">${p.category}</span>
-        <span class="font-mono">${p.endpoint}</span>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:8px;">${p.description}</p>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-3);">
+        <span class="mono" style="padding:2px 8px;background:var(--border);border-radius:4px;">${p.category}</span>
+        <span class="mono">${p.endpoint}</span>
       </div>
-      <div class="text-xs text-gray-600 mt-2 font-mono">Wallet: ${p.walletAddress.slice(0, 10)}… · Registered ${new Date(p.registeredAt).toLocaleDateString()}</div>
+      <div class="mono" style="font-size:11px;color:var(--text-3);margin-top:8px;">Wallet: ${p.walletAddress.slice(0, 10)}… · ${new Date(p.registeredAt).toLocaleDateString()}</div>
     </div>
   `).join('');
 
@@ -897,73 +897,116 @@ app.get('/providers', (c) => {
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AgentGate — Provider Marketplace</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050505; --surface: #0c0c0c; --border: #1a1a1a;
+      --text: #e8e8e8; --text-2: #737373; --text-3: #454545;
+      --accent: #c8ff00; --accent-dim: #3d4d00;
+    }
+    body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    code, .mono { font-family: 'DM Mono', monospace; }
+    .serif { font-family: 'Instrument Serif', serif; }
+    a { color: inherit; text-decoration: none; }
+    input, select { font-family: 'DM Mono', monospace; }
+    body::after {
+      content: ''; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: 0.015;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr !important; } }
+  </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen">
-  <div class="max-w-5xl mx-auto px-6 py-10">
-    <div class="flex items-center gap-4 mb-8">
-      <div class="text-4xl">🏪</div>
-      <div>
-        <h1 class="text-3xl font-bold">Provider Marketplace</h1>
-        <p class="text-gray-400">Register your API and start earning pathUSD from AI agents</p>
+<body>
+
+  <!-- Nav -->
+  <nav style="position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(5,5,5,0.8);border-bottom:1px solid var(--border);">
+    <div style="max-width:1100px;margin:0 auto;padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:32px;">
+        <a href="/" class="mono" style="font-size:15px;font-weight:600;letter-spacing:-0.02em;">agentgate</a>
+        <div style="display:flex;gap:24px;font-size:13px;color:var(--text-2);">
+          <a href="/" style="transition:color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-2)'">Home</a>
+          <a href="/dashboard" style="transition:color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-2)'">Dashboard</a>
+          <a href="/.well-known/x-agentgate.json" style="transition:color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-2)'">API</a>
+        </div>
       </div>
-      <a href="/" class="ml-auto text-blue-400 hover:underline text-sm">← Home</a>
+    </div>
+  </nav>
+
+  <div style="max-width:1100px;margin:0 auto;padding:60px 24px;">
+
+    <!-- Header -->
+    <div style="margin-bottom:48px;">
+      <p class="mono" style="font-size:12px;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;">Provider Marketplace</p>
+      <h1 style="font-size:36px;font-weight:300;letter-spacing:-0.03em;margin-bottom:8px;">
+        List your API. <span class="serif" style="font-style:italic;">Get paid in stablecoins.</span>
+      </h1>
+      <p style="font-size:15px;color:var(--text-2);max-width:520px;">Register your endpoint and AI agents can discover and pay for it automatically via HTTP 402.</p>
     </div>
 
     <!-- Registration Form -->
-    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-8">
-      <h2 class="text-xl font-semibold mb-4">Register Your API</h2>
-      <form id="registerForm" class="grid md:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Service Name *</label>
-          <input name="name" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="My LLM API">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:28px;margin-bottom:48px;">
+      <p style="font-size:14px;font-weight:500;margin-bottom:20px;">Register your API</p>
+      <form id="registerForm">
+        <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div>
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Service Name *</label>
+            <input name="name" required placeholder="My LLM API" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-dim)'" onblur="this.style.borderColor='var(--border)'">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Endpoint URL *</label>
+            <input name="endpoint" required placeholder="https://my-api.com/inference" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-dim)'" onblur="this.style.borderColor='var(--border)'">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Price (pathUSD) *</label>
+            <input name="price" required placeholder="0.01" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-dim)'" onblur="this.style.borderColor='var(--border)'">
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Category</label>
+            <select name="category" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--text);outline:none;cursor:pointer;">
+              <option value="inference">Inference</option>
+              <option value="data">Data</option>
+              <option value="compute">Compute</option>
+              <option value="storage">Storage</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Endpoint URL *</label>
-          <input name="endpoint" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="https://my-api.com/inference">
+        <div style="margin-bottom:16px;">
+          <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Description</label>
+          <input name="description" placeholder="GPT-4 proxy with function calling support" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-dim)'" onblur="this.style.borderColor='var(--border)'">
         </div>
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Price (pathUSD) *</label>
-          <input name="price" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="0.01">
+        <div style="margin-bottom:20px;">
+          <label style="display:block;font-size:12px;color:var(--text-3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Wallet Address *</label>
+          <input name="walletAddress" required placeholder="0x..." style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-dim)'" onblur="this.style.borderColor='var(--border)'">
         </div>
-        <div>
-          <label class="block text-sm text-gray-400 mb-1">Category</label>
-          <select name="category" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-            <option value="inference">🧠 Inference</option>
-            <option value="data">📊 Data</option>
-            <option value="compute">⚡ Compute</option>
-            <option value="storage">💾 Storage</option>
-            <option value="other">🔧 Other</option>
-          </select>
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm text-gray-400 mb-1">Description</label>
-          <input name="description" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" placeholder="GPT-4 proxy with function calling support">
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm text-gray-400 mb-1">Wallet Address (receives payments) *</label>
-          <input name="walletAddress" required class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none" placeholder="0x...">
-        </div>
-        <div class="md:col-span-2">
-          <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition">Register Service →</button>
-          <span id="formStatus" class="ml-3 text-sm"></span>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button type="submit" style="font-family:'Outfit',sans-serif;font-size:13px;padding:10px 20px;background:var(--accent);color:#000;font-weight:500;border:none;border-radius:6px;cursor:pointer;transition:opacity 0.2s;" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">Register →</button>
+          <span id="formStatus" style="font-size:13px;"></span>
         </div>
       </form>
     </div>
 
     <!-- Registered Providers -->
-    <h2 class="text-xl font-semibold mb-4">Registered Services (${registeredProviders.length})</h2>
-    ${registeredProviders.length === 0
-      ? '<div class="bg-gray-900 rounded-xl border border-gray-800 p-8 text-center text-gray-500">No external providers registered yet. Be the first!</div>'
-      : `<div class="grid md:grid-cols-2 gap-4">${providerCards}</div>`}
-
-    <div class="mt-8 text-center text-gray-600 text-sm">
-      <a href="/auth/passkey" class="text-purple-400 hover:underline">🔐 Sign in with Passkey</a> ·
-      <a href="/" class="text-blue-400 hover:underline">Home</a> ·
-      <a href="/dashboard" class="text-blue-400 hover:underline">Dashboard</a> ·
-      <a href="/.well-known/x-agentgate.json" class="text-blue-400 hover:underline">Discovery API</a>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;">
+      <p style="font-size:14px;font-weight:500;">Registered services</p>
+      <span class="mono" style="font-size:12px;color:var(--text-3);">${registeredProviders.length} total</span>
     </div>
+    ${registeredProviders.length === 0
+      ? '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:40px;text-align:center;color:var(--text-3);font-size:14px;">No external providers registered yet. Be the first.</div>'
+      : '<div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' + providerCards + '</div>'}
+
+    <!-- Footer -->
+    <div style="margin-top:48px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:20px;font-size:12px;color:var(--text-3);">
+      <a href="/" style="transition:color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-3)'">Home</a>
+      <a href="/dashboard" style="transition:color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-3)'">Dashboard</a>
+      <a href="/auth/passkey" style="transition:color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-3)'">Passkeys</a>
+      <a href="/.well-known/x-agentgate.json" style="transition:color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-3)'">API</a>
+    </div>
+
   </div>
+
   <script>
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -971,7 +1014,7 @@ app.get('/providers', (c) => {
       const data = Object.fromEntries(new FormData(form));
       const status = document.getElementById('formStatus');
       status.textContent = 'Registering...';
-      status.className = 'ml-3 text-sm text-yellow-400';
+      status.style.color = '#ffd43b';
       try {
         const res = await fetch('/api/providers/register', {
           method: 'POST',
@@ -979,17 +1022,17 @@ app.get('/providers', (c) => {
           body: JSON.stringify(data),
         });
         if (res.ok) {
-          status.textContent = '✓ Registered! Reloading...';
-          status.className = 'ml-3 text-sm text-green-400';
+          status.textContent = '✓ Registered!';
+          status.style.color = '#00e87b';
           setTimeout(() => location.reload(), 1000);
         } else {
           const err = await res.json();
           status.textContent = '✗ ' + (err.error || 'Failed');
-          status.className = 'ml-3 text-sm text-red-400';
+          status.style.color = '#ff4040';
         }
       } catch (err) {
         status.textContent = '✗ Network error';
-        status.className = 'ml-3 text-sm text-red-400';
+        status.style.color = '#ff4040';
       }
     });
   </script>
@@ -1563,14 +1606,24 @@ app.<span class="fn">post</span>(<span class="str">'/api/generate'</span>, (c) =
   <!-- Stack — horizontal compact -->
   <section style="max-width:1100px;margin:0 auto;padding:0 24px 80px;">
     <div style="border:1px solid var(--border);border-radius:8px;padding:24px 28px;">
-      <p style="font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:16px;" class="mono">Built with</p>
-      <div style="display:flex;flex-wrap:wrap;gap:32px;">
-        <div><span style="font-size:14px;font-weight:500;">Tempo</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">~2s finality, $0 gas</span></div>
-        <div><span style="font-size:14px;font-weight:500;">Privy</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">server wallets</span></div>
-        <div><span style="font-size:14px;font-weight:500;">pathUSD</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">stablecoin</span></div>
-        <div><span style="font-size:14px;font-weight:500;">Bun + Hono</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">runtime</span></div>
-        <div><span style="font-size:14px;font-weight:500;">viem</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">on-chain</span></div>
-        <div><span style="font-size:14px;font-weight:500;">Passkeys</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">WebAuthn</span></div>
+      <p style="font-size:12px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:20px;" class="mono">Built with</p>
+      <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:center;">
+        <a href="https://tempo.xyz" target="_blank" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+          <img src="https://tempo.xyz/favicon.ico" alt="Tempo" style="width:24px;height:24px;border-radius:4px;">
+          <div><span style="font-size:14px;font-weight:500;">Tempo</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">~2s finality · $0 gas · pathUSD · passkeys</span></div>
+        </a>
+        <a href="https://privy.io" target="_blank" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+          <img src="https://privy.io/favicon.ico" alt="Privy" style="width:24px;height:24px;border-radius:4px;">
+          <div><span style="font-size:14px;font-weight:500;">Privy</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">server wallets · fee sponsorship</span></div>
+        </a>
+        <a href="https://viem.sh" target="_blank" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+          <img src="https://viem.sh/icon-light.png" alt="viem" style="width:24px;height:24px;border-radius:4px;">
+          <div><span style="font-size:14px;font-weight:500;">viem</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">on-chain interactions</span></div>
+        </a>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <img src="https://bun.sh/logo.svg" alt="Bun" style="width:24px;height:24px;">
+          <div><span style="font-size:14px;font-weight:500;">Bun + Hono</span> <span style="font-size:12px;color:var(--text-3);margin-left:4px;">runtime</span></div>
+        </div>
       </div>
     </div>
   </section>
@@ -1582,8 +1635,8 @@ app.<span class="fn">post</span>(<span class="str">'/api/generate'</span>, (c) =
     </p>
     <p style="font-size:15px;color:var(--text-2);margin-bottom:28px;">The future is autonomous agents with wallets.</p>
     <div style="display:flex;gap:12px;justify-content:center;">
-      <a href="/providers" style="font-size:13px;padding:10px 20px;background:var(--accent);color:#000;font-weight:500;border-radius:6px;">List your API</a>
-      <a href="https://github.com/ss251/agentgate" style="font-size:13px;padding:10px 20px;border:1px solid var(--border);border-radius:6px;color:var(--text-2);">View source ↗</a>
+      <a href="/providers" style="font-size:13px;padding:10px 20px;background:var(--accent);color:#000;font-weight:500;border-radius:6px;display:inline-flex;align-items:center;">List your API</a>
+      <a href="https://github.com/ss251/agentgate" style="font-size:13px;padding:10px 20px;border:1px solid var(--border);border-radius:6px;color:var(--text-2);display:inline-flex;align-items:center;">View source ↗</a>
     </div>
   </section>
 
