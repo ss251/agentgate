@@ -3,16 +3,26 @@
   "version": "0.1.0",
   "description": "Core types, chain definitions, token addresses, and payment verification for AgentGate — the HTTP 402 payment protocol for AI agents on Tempo",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
-  "files": ["src"],
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build"
+  },
   "keywords": ["agentgate", "tempo", "tip-20", "402", "payment", "ai-agent", "blockchain"],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/thescoho/agentgate"
+  },
+  "peerDependencies": {
+    "viem": ">=2.0.0"
   }
 }

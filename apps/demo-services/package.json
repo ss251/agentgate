@@ -1,8 +1,0 @@
-{
-  "name": "@agentgate/demo",
-  "version": "0.1.0",
-  "type": "module",
-  "dependencies": {
-    "@agentgate/sdk": "workspace:*"
-  }
-}

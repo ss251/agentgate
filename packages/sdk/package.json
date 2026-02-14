@@ -3,16 +3,27 @@
   "version": "0.1.0",
   "description": "SDK for AI agents to auto-pay HTTP 402 APIs with on-chain TIP-20 transfers on Tempo",
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
-  "files": ["src"],
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build"
+  },
   "keywords": ["agentgate", "sdk", "agent", "402", "auto-pay", "tempo"],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thescoho/agentgate"
+  },
   "dependencies": {
-    "@agentgate/core": "workspace:*"
+    "@agentgate/core": "^0.1.0"
   },
   "peerDependencies": {
     "viem": ">=2.0.0"

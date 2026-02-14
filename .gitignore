@@ -1,5 +1,9 @@
-node_modules
-dist
+node_modules/
+dist/
 .env
 *.log
 .sites/
+.tmp-exec/
+bun.lockb
+bun.lock
+*.tsbuildinfo

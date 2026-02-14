@@ -15,28 +15,6 @@
         "typescript": "^5.9.3",
       },
     },
-    "apps/demo": {
-      "name": "demo",
-      "version": "0.1.0",
-      "dependencies": {
-        "@agentgate/client": "workspace:*",
-        "@agentgate/core": "workspace:*",
-        "@agentgate/middleware": "workspace:*",
-        "hono": "^4.6.0",
-        "viem": "^2.21.0",
-      },
-      "devDependencies": {
-        "bun-types": "latest",
-        "typescript": "^5.5.0",
-      },
-    },
-    "apps/demo-services": {
-      "name": "@agentgate/demo",
-      "version": "0.1.0",
-      "dependencies": {
-        "@agentgate/sdk": "workspace:*",
-      },
-    },
     "apps/gateway": {
       "name": "@agentgate/gateway",
       "version": "0.1.0",
@@ -45,45 +23,39 @@
         "@agentgate/middleware": "workspace:*",
       },
     },
-    "packages/client": {
-      "name": "@agentgate/client",
-      "version": "0.1.0",
-      "dependencies": {
-        "@agentgate/core": "workspace:*",
-        "viem": "^2.21.0",
-      },
-      "devDependencies": {
-        "bun-types": "latest",
-        "typescript": "^5.5.0",
-      },
-    },
     "packages/core": {
       "name": "@agentgate/core",
       "version": "0.1.0",
+      "peerDependencies": {
+        "viem": ">=2.0.0",
+      },
     },
     "packages/middleware": {
       "name": "@agentgate/middleware",
       "version": "0.1.0",
       "dependencies": {
-        "@agentgate/core": "workspace:*",
+        "@agentgate/core": "^0.1.0",
+      },
+      "peerDependencies": {
+        "hono": ">=4.0.0",
+        "viem": ">=2.0.0",
       },
     },
     "packages/sdk": {
       "name": "@agentgate/sdk",
       "version": "0.1.0",
       "dependencies": {
-        "@agentgate/core": "workspace:*",
+        "@agentgate/core": "^0.1.0",
+      },
+      "peerDependencies": {
+        "viem": ">=2.0.0",
       },
     },
   },
   "packages": {
     "@adraffy/ens-normalize": ["@adraffy/ens-normalize@1.11.1", "", {}, "sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ=="],
 
-    "@agentgate/client": ["@agentgate/client@workspace:packages/client"],
-
     "@agentgate/core": ["@agentgate/core@workspace:packages/core"],
-
-    "@agentgate/demo": ["@agentgate/demo@workspace:apps/demo-services"],
 
     "@agentgate/gateway": ["@agentgate/gateway@workspace:apps/gateway"],
 
@@ -172,8 +144,6 @@
     "css-what": ["css-what@6.2.2", "", {}, "sha512-u/O3vwbptzhMs3L1fQE82ZSLHQQfto5gyZzwteVIEyeaY5Fc7R4dapF/BvRoSYFeqfBk4m0V1Vafq5Pjv25wvA=="],
 
     "delay": ["delay@5.0.0", "", {}, "sha512-ReEBKkIfe4ya47wlPYf/gu5ib6yUG0/Aez0JQZQz94kiWtRQvZIQbTiehsnwHvLSWJnQdhVeqYue7Id1dKr0qw=="],
-
-    "demo": ["demo@workspace:apps/demo"],
 
     "dom-serializer": ["dom-serializer@2.0.0", "", { "dependencies": { "domelementtype": "^2.3.0", "domhandler": "^5.0.2", "entities": "^4.2.0" } }, "sha512-wIkAryiqt/nV5EQKqQpo3SToSOV9J0DnbJqwK7Wv/Trc92zIAYZ4FlMu+JPFW1DfGFt81ZTCGgDEabffXeLyJg=="],
 
