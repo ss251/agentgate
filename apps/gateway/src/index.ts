@@ -144,6 +144,84 @@ app.get('/api/sites', (c) => {
   }
 });
 
+// ─── Privy Wallet Provisioning ───────────────────────────────────
+const PRIVY_APP_ID = process.env.PRIVY_APP_ID ?? '';
+const PRIVY_APP_SECRET = process.env.PRIVY_APP_SECRET ?? '';
+
+app.post('/api/wallets/create', async (c) => {
+  if (!PRIVY_APP_ID || !PRIVY_APP_SECRET) {
+    return c.json({ error: 'Privy not configured', code: 'PRIVY_NOT_CONFIGURED' }, 503);
+  }
+
+  try {
+    const basicAuth = Buffer.from(`${PRIVY_APP_ID}:${PRIVY_APP_SECRET}`).toString('base64');
+    const res = await fetch('https://api.privy.io/v1/wallets', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'privy-app-id': PRIVY_APP_ID,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ chain_type: 'ethereum' }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      return c.json({ error: 'Privy wallet creation failed', details: err }, 502);
+    }
+
+    const data = await res.json() as any;
+    return c.json({ walletId: data.id, address: data.address });
+  } catch (err: any) {
+    return c.json({ error: `Wallet creation error: ${err.message}` }, 500);
+  }
+});
+
+app.get('/api/wallets/:walletId/balance', async (c) => {
+  const walletId = c.req.param('walletId');
+
+  if (!PRIVY_APP_ID || !PRIVY_APP_SECRET) {
+    return c.json({ error: 'Privy not configured', code: 'PRIVY_NOT_CONFIGURED' }, 503);
+  }
+
+  try {
+    // Get wallet address from Privy
+    const basicAuth = Buffer.from(`${PRIVY_APP_ID}:${PRIVY_APP_SECRET}`).toString('base64');
+    const walletRes = await fetch(`https://api.privy.io/v1/wallets/${walletId}`, {
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'privy-app-id': PRIVY_APP_ID,
+      },
+    });
+
+    if (!walletRes.ok) {
+      return c.json({ error: 'Wallet not found' }, 404);
+    }
+
+    const walletData = await walletRes.json() as any;
+    const walletAddress = walletData.address as Address;
+
+    // Check on-chain balance
+    const client = createPublicClient({ chain: tempoTestnet, transport: http() });
+    const balance = await client.readContract({
+      address: STABLECOINS.pathUSD.address,
+      abi: [{ type: 'function', name: 'balanceOf', inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' }],
+      functionName: 'balanceOf',
+      args: [walletAddress],
+    }) as bigint;
+
+    return c.json({
+      walletId,
+      address: walletAddress,
+      balance: formatUnits(balance, 6),
+      balanceRaw: balance.toString(),
+      token: 'pathUSD',
+    });
+  } catch (err: any) {
+    return c.json({ error: `Balance check failed: ${err.message}` }, 500);
+  }
+});
+
 // ─── Paywall Middleware ──────────────────────────────────────────
 app.use(
   '/api/*',

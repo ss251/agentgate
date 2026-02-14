@@ -11,16 +11,33 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { tempoTestnet, ERC20_ABI, STABLECOINS, type StablecoinSymbol } from '@tempo-agentgate/core';
 
+// ─── Config Types ────────────────────────────────────────────────
+
 export interface AgentWalletConfig {
   privateKey: Hex;
+  feePayerPrivateKey?: Hex;
   chain?: Chain;
   rpcUrl?: string;
-  /** Max retries for transient failures (default: 3) */
   maxRetries?: number;
-  /** Overall timeout for fetch cycle in ms (default: 60000) */
   timeoutMs?: number;
-  /** Callback for payment lifecycle events */
   onPaymentEvent?: (event: PaymentEvent) => void;
+}
+
+export interface PrivyWalletConfig {
+  privyAppId: string;
+  privyAppSecret: string;
+  walletId: string;
+  chain?: Chain;
+  rpcUrl?: string;
+  maxRetries?: number;
+  timeoutMs?: number;
+  onPaymentEvent?: (event: PaymentEvent) => void;
+}
+
+export type AgentGateConfig = AgentWalletConfig | PrivyWalletConfig;
+
+function isPrivyConfig(config: AgentGateConfig): config is PrivyWalletConfig {
+  return 'privyAppId' in config && 'privyAppSecret' in config && 'walletId' in config;
 }
 
 export type PaymentEvent =
@@ -30,8 +47,93 @@ export type PaymentEvent =
   | { type: 'retrying'; attempt: number; reason: string }
   | { type: 'error'; error: string };
 
+// ─── Privy API Helper ────────────────────────────────────────────
+
+async function privySendTransaction(config: PrivyWalletConfig, params: {
+  to: Address;
+  data: Hex;
+  chainId: number;
+}): Promise<Hex> {
+  const basicAuth = Buffer.from(`${config.privyAppId}:${config.privyAppSecret}`).toString('base64');
+
+  const res = await fetch(`https://api.privy.io/v1/wallets/${config.walletId}/rpc`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${basicAuth}`,
+      'privy-app-id': config.privyAppId,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      method: 'eth_sendTransaction',
+      caip2: `eip155:${params.chainId}`,
+      params: {
+        transaction: {
+          to: params.to,
+          data: params.data,
+        },
+      },
+      sponsor: true, // Fee sponsorship — Privy handles gas
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Privy RPC failed (${res.status}): ${err}`);
+  }
+
+  const result = await res.json() as any;
+  return result.data?.hash ?? result.hash ?? result.result;
+}
+
+async function privyGetAddress(config: PrivyWalletConfig): Promise<Address> {
+  const basicAuth = Buffer.from(`${config.privyAppId}:${config.privyAppSecret}`).toString('base64');
+
+  const res = await fetch(`https://api.privy.io/v1/wallets/${config.walletId}`, {
+    headers: {
+      'Authorization': `Basic ${basicAuth}`,
+      'privy-app-id': config.privyAppId,
+    },
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Privy wallet fetch failed (${res.status}): ${err}`);
+  }
+
+  const data = await res.json() as any;
+  return data.address as Address;
+}
+
+export async function createPrivyWallet(appId: string, appSecret: string): Promise<{ walletId: string; address: string }> {
+  const basicAuth = Buffer.from(`${appId}:${appSecret}`).toString('base64');
+
+  const res = await fetch('https://api.privy.io/v1/wallets', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${basicAuth}`,
+      'privy-app-id': appId,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ chain_type: 'ethereum' }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Privy wallet creation failed (${res.status}): ${err}`);
+  }
+
+  const data = await res.json() as any;
+  return { walletId: data.id, address: data.address };
+}
+
+// ─── AgentGateClient ─────────────────────────────────────────────
+
 /**
  * AgentGate SDK — wraps fetch with automatic 402 payment handling.
+ *
+ * Supports two wallet modes:
+ * 1. Raw private key (viem) — direct on-chain signing
+ * 2. Privy server wallet — delegated signing via Privy API with fee sponsorship
  *
  * Features:
  * - Auto-detect 402 Payment Required and pay on-chain
@@ -39,17 +141,25 @@ export type PaymentEvent =
  * - Optional balance pre-check (fail fast if insufficient funds)
  * - Payment lifecycle callbacks
  * - Batch fetching via fetchMany()
+ * - Fee sponsorship (automatic with Privy, optional with raw keys)
  */
 export class AgentGateClient {
-  private account: ReturnType<typeof privateKeyToAccount>;
+  private account: ReturnType<typeof privateKeyToAccount> | null = null;
+  private privyConfig: PrivyWalletConfig | null = null;
   private chain: Chain;
   private rpcUrl?: string;
   private maxRetries: number;
   private timeoutMs: number;
   private onPaymentEvent?: (event: PaymentEvent) => void;
+  private _address: Address | null = null;
 
-  constructor(config: AgentWalletConfig) {
-    this.account = privateKeyToAccount(config.privateKey);
+  constructor(config: AgentGateConfig) {
+    if (isPrivyConfig(config)) {
+      this.privyConfig = config;
+    } else {
+      this.account = privateKeyToAccount(config.privateKey);
+      this._address = this.account.address;
+    }
     this.chain = config.chain ?? tempoTestnet;
     this.rpcUrl = config.rpcUrl;
     this.maxRetries = config.maxRetries ?? 3;
@@ -58,7 +168,25 @@ export class AgentGateClient {
   }
 
   get address(): Address {
-    return this.account.address;
+    if (this._address) return this._address;
+    throw new Error('Address not yet resolved. Call resolveAddress() first for Privy wallets.');
+  }
+
+  /**
+   * Resolve the wallet address. Required for Privy wallets before first use.
+   * For raw key wallets, this is a no-op.
+   */
+  async resolveAddress(): Promise<Address> {
+    if (this._address) return this._address;
+    if (this.privyConfig) {
+      this._address = await privyGetAddress(this.privyConfig);
+      return this._address;
+    }
+    throw new Error('No wallet configured');
+  }
+
+  private get isPrivy(): boolean {
+    return this.privyConfig !== null;
   }
 
   private emit(event: PaymentEvent) {
@@ -70,6 +198,11 @@ export class AgentGateClient {
    * Includes retry logic with exponential backoff for transient failures.
    */
   async fetch(url: string, init?: RequestInit): Promise<Response> {
+    // Ensure address is resolved for Privy wallets
+    if (this.isPrivy && !this._address) {
+      await this.resolveAddress();
+    }
+
     const deadline = Date.now() + this.timeoutMs;
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
@@ -78,7 +211,7 @@ export class AgentGateClient {
       }
 
       try {
-        const response = await fetch(url, init);
+        const response = await globalThis.fetch(url, init);
 
         if (response.status !== 402) {
           return response;
@@ -134,7 +267,7 @@ export class AgentGateClient {
         const retryHeaders = new Headers(init?.headers);
         retryHeaders.set('X-Payment', `${txHash}:${this.chain.id}`);
 
-        const retryResponse = await fetch(url, {
+        const retryResponse = await globalThis.fetch(url, {
           ...init,
           headers: retryHeaders,
         });
@@ -172,22 +305,41 @@ export class AgentGateClient {
 
   /**
    * Send an ERC-20 transfer on-chain.
+   * Uses Privy API when configured, otherwise uses viem wallet client.
    */
   async sendPayment(params: {
     to: Address;
     tokenAddress: Address;
     amount: bigint;
   }): Promise<Hex> {
-    const walletClient = createWalletClient({
-      account: this.account,
-      chain: this.chain,
-      transport: http(this.rpcUrl),
-    });
-
     const data = encodeFunctionData({
       abi: ERC20_ABI,
       functionName: 'transfer',
       args: [params.to, params.amount],
+    });
+
+    if (this.privyConfig) {
+      // Privy path — delegated signing with fee sponsorship
+      const txHash = await privySendTransaction(this.privyConfig, {
+        to: params.tokenAddress,
+        data,
+        chainId: this.chain.id,
+      });
+
+      // Wait for confirmation via public client
+      const publicClient = createPublicClient({
+        chain: this.chain,
+        transport: http(this.rpcUrl),
+      });
+      await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1 });
+      return txHash;
+    }
+
+    // Raw key path — direct viem signing
+    const walletClient = createWalletClient({
+      account: this.account!,
+      chain: this.chain,
+      transport: http(this.rpcUrl),
     });
 
     const hash = await walletClient.sendTransaction({
@@ -208,6 +360,8 @@ export class AgentGateClient {
    * Check token balance for this agent's wallet.
    */
   async getBalance(token: StablecoinSymbol = 'pathUSD'): Promise<bigint> {
+    const addr = this._address ?? (await this.resolveAddress());
+
     const publicClient = createPublicClient({
       chain: this.chain,
       transport: http(this.rpcUrl),
@@ -217,7 +371,7 @@ export class AgentGateClient {
       address: STABLECOINS[token].address,
       abi: ERC20_ABI,
       functionName: 'balanceOf',
-      args: [this.account.address],
+      args: [addr],
     })) as bigint;
   }
 
@@ -225,7 +379,7 @@ export class AgentGateClient {
    * Discover services at a gateway URL.
    */
   async discover(baseUrl: string): Promise<any> {
-    const res = await fetch(`${baseUrl}/.well-known/x-agentgate.json`);
+    const res = await globalThis.fetch(`${baseUrl}/.well-known/x-agentgate.json`);
     if (!res.ok) throw new Error(`Discovery failed: ${res.status}`);
     return res.json();
   }

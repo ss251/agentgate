@@ -120,6 +120,57 @@ const agent = new AgentGateClient({
 });
 ```
 
+### Privy Server Wallets (Managed Mode)
+
+Instead of managing raw private keys, agents can use [Privy server wallets](https://docs.privy.io/guide/server-wallets/) for delegated key management with built-in fee sponsorship:
+
+```typescript
+import { AgentGateClient } from '@tempo-agentgate/sdk';
+
+const agent = new AgentGateClient({
+  privyAppId: 'your-privy-app-id',
+  privyAppSecret: 'your-privy-app-secret',
+  walletId: 'wallet-id-from-privy',
+});
+
+// Resolve the wallet address (required once for Privy wallets)
+await agent.resolveAddress();
+
+// Everything else works the same — payments use Privy's API
+// with automatic fee sponsorship (no gas tokens needed!)
+const res = await agent.fetch('http://localhost:3402/api/execute', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ code: 'console.log("hello")', language: 'typescript' }),
+});
+```
+
+**Provision a new wallet via the gateway:**
+
+```bash
+curl -X POST http://localhost:3402/api/wallets/create
+# Returns: { "walletId": "...", "address": "0x..." }
+
+# Check balance:
+curl http://localhost:3402/api/wallets/<walletId>/balance
+```
+
+### Fee Sponsorship
+
+Tempo supports fee sponsorship where a third party pays gas on behalf of the sender. This means agents don't need to hold any native gas tokens — only pathUSD.
+
+- **Privy wallets:** Fee sponsorship is automatic (`sponsor: true` is sent with every transaction).
+- **Raw private keys:** Use Tempo's native `withFeePayer` transport or provide a `feePayerPrivateKey` in the config. See the [Tempo docs on fee sponsorship](https://docs.tempo.xyz) for details.
+
+### Passkey Support
+
+Tempo supports [WebAuthn passkeys](https://webauthn.guide/) for user authentication. In the AgentGate context:
+
+- **Agents** use server wallets (Privy or raw keys) — passkeys don't apply.
+- **Providers** (humans running gateways) can authenticate to the dashboard using Tempo's native passkey accounts. This enables passwordless login for managing gateway settings, viewing transactions, and monitoring services.
+
+Passkey integration uses Tempo's built-in account abstraction. Providers who create a Tempo account with a passkey can sign transactions directly from the browser without managing seed phrases.
+
 ## Middleware Usage (Provider Side)
 
 ```typescript
