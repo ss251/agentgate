@@ -51,7 +51,9 @@ describe('Service Discovery', () => {
 // ─── Free Endpoints ──────────────────────────────────────────────
 describe('Free Endpoints', () => {
   test('GET / returns gateway info without payment', async () => {
-    const res = await fetch(GATEWAY_URL);
+    const res = await fetch(GATEWAY_URL, {
+      headers: { Accept: 'application/json' },
+    });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.service).toBe('AgentGate Gateway');

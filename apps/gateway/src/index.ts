@@ -64,12 +64,46 @@ interface TransactionLog {
   timestamp: string;
 }
 
-const stats = {
-  totalRequests: 0,
-  paidRequests: 0,
-  totalRevenue: BigInt(0), // in raw pathUSD units (6 decimals)
-  recentTransactions: [] as TransactionLog[],
-};
+// ─── Persistent Stats ────────────────────────────────────────────
+const STATS_FILE = new URL('../.stats.json', import.meta.url).pathname;
+
+interface StatsData {
+  totalRequests: number;
+  paidRequests: number;
+  totalRevenue: string; // bigint serialized as string
+  recentTransactions: TransactionLog[];
+}
+
+function loadStats(): { totalRequests: number; paidRequests: number; totalRevenue: bigint; recentTransactions: TransactionLog[] } {
+  try {
+    const raw = require('fs').readFileSync(STATS_FILE, 'utf-8');
+    const data: StatsData = JSON.parse(raw);
+    return {
+      totalRequests: data.totalRequests || 0,
+      paidRequests: data.paidRequests || 0,
+      totalRevenue: BigInt(data.totalRevenue || '0'),
+      recentTransactions: data.recentTransactions || [],
+    };
+  } catch {
+    return { totalRequests: 0, paidRequests: 0, totalRevenue: BigInt(0), recentTransactions: [] };
+  }
+}
+
+function saveStats() {
+  const data: StatsData = {
+    totalRequests: stats.totalRequests,
+    paidRequests: stats.paidRequests,
+    totalRevenue: stats.totalRevenue.toString(),
+    recentTransactions: stats.recentTransactions,
+  };
+  try {
+    require('fs').writeFileSync(STATS_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('Failed to persist stats:', e);
+  }
+}
+
+const stats = loadStats();
 
 // ─── Passkey Credential Store (In-Memory) ────────────────────────
 interface PasskeyCredential {
@@ -106,6 +140,7 @@ app.use('*', logger());
 app.use('*', async (c, next) => {
   const requestId = crypto.randomUUID();
   stats.totalRequests++;
+  saveStats();
   await next();
   c.res.headers.set('X-Request-Id', requestId);
   c.res.headers.set('X-Powered-By', 'AgentGate');
@@ -302,6 +337,7 @@ app.use(
         stats.recentTransactions.pop();
       }
       console.log(`💰 Payment received: ${formatUnits(amount, 6)} pathUSD from ${from} for ${endpoint} (tx: ${txHash})`);
+      saveStats();
     },
   })
 );
