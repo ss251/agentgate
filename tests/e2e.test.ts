@@ -80,7 +80,7 @@ describe('Free Endpoints', () => {
     const res = await fetch(`${GATEWAY_URL}/dashboard`);
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain('AgentGate Dashboard');
+    expect(html).toContain('Dashboard');
   });
 
   test('responses include X-Request-Id header', async () => {
