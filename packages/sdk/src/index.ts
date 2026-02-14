@@ -323,11 +323,239 @@ export class AgentGateClient {
 
   /**
    * Fetch multiple URLs in parallel with automatic payment handling.
+   *
+   * **Tempo-native optimization**: Unlike Ethereum where nonces are sequential
+   * (forcing transactions to be sent one-at-a-time), Tempo uses a 2D nonce system
+   * with expiring nonces. This means multiple payment transactions can be submitted
+   * concurrently in the same block without nonce conflicts.
+   *
+   * Flow:
+   * 1. Fire all requests in parallel to discover which need payment (402s)
+   * 2. Send all payment transactions concurrently (Tempo's 2D nonces allow this)
+   * 3. Retry all paid requests in parallel with payment headers
+   *
+   * Reference: https://docs.tempo.xyz
    */
   async fetchMany(
     requests: Array<{ url: string; init?: RequestInit }>,
   ): Promise<Response[]> {
-    return Promise.all(requests.map((r) => this.fetch(r.url, r.init)));
+    // Ensure address is resolved for Privy wallets
+    if (this.isPrivy && !this._address) {
+      await this.resolveAddress();
+    }
+
+    // Phase 1: Fire all requests in parallel to discover payment requirements
+    const initialResponses = await Promise.all(
+      requests.map(async (r) => {
+        try {
+          return await globalThis.fetch(r.url, r.init);
+        } catch (err) {
+          return null;
+        }
+      })
+    );
+
+    // Phase 2: Identify which responses are 402s and extract payment info
+    const paymentTasks: Array<{
+      index: number;
+      payment: any;
+      request: { url: string; init?: RequestInit };
+    }> = [];
+
+    const results: (Response | null)[] = [...initialResponses];
+
+    for (let i = 0; i < initialResponses.length; i++) {
+      const res = initialResponses[i];
+      if (res && res.status === 402) {
+        try {
+          const body = await res.json();
+          if (body.payment?.recipientAddress && body.payment?.amountRequired && body.payment?.tokenAddress) {
+            paymentTasks.push({ index: i, payment: body.payment, request: requests[i] });
+            results[i] = null; // Mark for retry
+          }
+        } catch {
+          // Not a valid 402 response, keep as-is
+        }
+      }
+    }
+
+    if (paymentTasks.length === 0) {
+      return results.map((r, i) => r ?? initialResponses[i]!) as Response[];
+    }
+
+    // Phase 3: Send all payments in parallel
+    // Tempo's expiring 2D nonces allow concurrent transaction submission —
+    // each tx gets a unique (queue, nonce) pair that expires after a time window,
+    // unlike Ethereum's sequential nonce which forces serial execution.
+    const paymentResults = await Promise.all(
+      paymentTasks.map(async (task) => {
+        try {
+          this.emit({
+            type: 'payment_required',
+            amount: task.payment.amountHuman ?? task.payment.amountRequired,
+            token: task.payment.tokenSymbol ?? 'pathUSD',
+            endpoint: task.request.url,
+          });
+
+          const txHash = await this.sendPayment({
+            to: task.payment.recipientAddress,
+            tokenAddress: task.payment.tokenAddress,
+            amount: BigInt(task.payment.amountRequired),
+          });
+
+          this.emit({ type: 'payment_confirmed', txHash });
+          return { index: task.index, txHash, request: task.request };
+        } catch (err: any) {
+          this.emit({ type: 'error', error: err.message });
+          throw err;
+        }
+      })
+    );
+
+    // Phase 4: Retry all paid requests in parallel with payment headers
+    const retryResults = await Promise.all(
+      paymentResults.map(async ({ index, txHash, request }) => {
+        const retryHeaders = new Headers(request.init?.headers);
+        retryHeaders.set('X-Payment', `${txHash}:${this.chain.id}`);
+        const response = await globalThis.fetch(request.url, {
+          ...request.init,
+          headers: retryHeaders,
+        });
+        return { index, response };
+      })
+    );
+
+    // Merge results
+    for (const { index, response } of retryResults) {
+      results[index] = response;
+    }
+
+    return results as Response[];
+  }
+
+  /**
+   * Fetch multiple URLs using a single batched Tempo transaction.
+   *
+   * **Tempo-native feature**: Tempo supports batch transactions that atomically
+   * execute multiple calls in a single transaction. This means an agent can pay
+   * for multiple API calls with one on-chain transaction, reducing latency and
+   * ensuring atomicity (all payments succeed or all fail).
+   *
+   * Flow:
+   * 1. Discover all payment requirements (fire requests, collect 402s)
+   * 2. Batch all ERC-20 transfers into a single transaction using multicall
+   * 3. Retry all requests with the single batch tx hash
+   *
+   * Reference: https://docs.tempo.xyz/guide/use-accounts/batch-transactions
+   *
+   * Note: Full batch transaction support requires Tempo's native batch call type.
+   * This implementation uses sequential transfers as a fallback, but documents
+   * how it would work with Tempo's native batching for atomic multi-service payments.
+   */
+  async fetchBatch(
+    requests: Array<{ url: string; init?: RequestInit }>,
+  ): Promise<Response[]> {
+    // Ensure address is resolved for Privy wallets
+    if (this.isPrivy && !this._address) {
+      await this.resolveAddress();
+    }
+
+    // Phase 1: Discover all payment requirements
+    const initialResponses = await Promise.all(
+      requests.map(async (r) => {
+        try {
+          return await globalThis.fetch(r.url, r.init);
+        } catch (err) {
+          return null;
+        }
+      })
+    );
+
+    const paymentTasks: Array<{
+      index: number;
+      payment: any;
+      request: { url: string; init?: RequestInit };
+    }> = [];
+
+    const results: (Response | null)[] = [...initialResponses];
+
+    for (let i = 0; i < initialResponses.length; i++) {
+      const res = initialResponses[i];
+      if (res && res.status === 402) {
+        try {
+          const body = await res.json();
+          if (body.payment?.recipientAddress && body.payment?.amountRequired && body.payment?.tokenAddress) {
+            paymentTasks.push({ index: i, payment: body.payment, request: requests[i] });
+            results[i] = null;
+          }
+        } catch {}
+      }
+    }
+
+    if (paymentTasks.length === 0) {
+      return results.map((r, i) => r ?? initialResponses[i]!) as Response[];
+    }
+
+    // Phase 2: Batch payments
+    // With Tempo's native batch transactions, all these transfers would be encoded
+    // as a single atomic batch call:
+    //
+    //   const batchCalls = paymentTasks.map(t => ({
+    //     target: t.payment.tokenAddress,
+    //     data: encodeFunctionData({
+    //       abi: ERC20_ABI,
+    //       functionName: 'transfer',
+    //       args: [t.payment.recipientAddress, BigInt(t.payment.amountRequired)]
+    //     })
+    //   }));
+    //   const txHash = await tempoAccount.executeBatch(batchCalls);
+    //
+    // This ensures atomicity: either ALL payments succeed or NONE do.
+    // For now, we fall back to parallel individual transfers.
+
+    console.log(`[AgentGate] 📦 Batch: ${paymentTasks.length} payments to process`);
+
+    const txHashes: Array<{ index: number; txHash: Hex; request: { url: string; init?: RequestInit } }> = [];
+
+    // Send payments (parallel, leveraging Tempo's 2D nonces)
+    const paymentResults = await Promise.all(
+      paymentTasks.map(async (task) => {
+        this.emit({
+          type: 'payment_required',
+          amount: task.payment.amountHuman ?? task.payment.amountRequired,
+          token: task.payment.tokenSymbol ?? 'pathUSD',
+          endpoint: task.request.url,
+        });
+
+        const txHash = await this.sendPayment({
+          to: task.payment.recipientAddress,
+          tokenAddress: task.payment.tokenAddress,
+          amount: BigInt(task.payment.amountRequired),
+        });
+
+        this.emit({ type: 'payment_confirmed', txHash });
+        return { index: task.index, txHash, request: task.request };
+      })
+    );
+
+    // Phase 3: Retry all paid requests with payment headers
+    const retryResults = await Promise.all(
+      paymentResults.map(async ({ index, txHash, request }) => {
+        const retryHeaders = new Headers(request.init?.headers);
+        retryHeaders.set('X-Payment', `${txHash}:${this.chain.id}`);
+        const response = await globalThis.fetch(request.url, {
+          ...request.init,
+          headers: retryHeaders,
+        });
+        return { index, response };
+      })
+    );
+
+    for (const { index, response } of retryResults) {
+      results[index] = response;
+    }
+
+    return results as Response[];
   }
 
   /**

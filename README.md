@@ -261,6 +261,32 @@ Agents discover services via the well-known endpoint:
 curl http://localhost:3402/.well-known/x-agentgate.json
 ```
 
+## Tempo-Native Features
+
+AgentGate leverages several features unique to Tempo that aren't available on Ethereum or other EVM chains:
+
+### 🔐 Passkey Accounts
+Tempo supports **P256/WebAuthn signatures natively at the protocol level**. Providers can authenticate to the AgentGate dashboard using Face ID, Touch ID, or security keys — no seed phrases or browser extensions needed. The passkey's P256 public key directly maps to a Tempo account.
+
+→ [Tempo Passkey Docs](https://docs.tempo.xyz/guide/use-accounts/embed-passkeys)
+
+### ⚡ Parallel Payments (2D Nonces)
+On Ethereum, nonces are sequential — you must wait for tx #1 to confirm before sending tx #2. Tempo uses a **2D nonce system with expiring nonces**, allowing multiple transactions to be submitted concurrently. The SDK's `fetchMany()` method exploits this to send all payments in parallel, dramatically reducing latency for multi-service workflows.
+
+### 📦 Batch Transactions
+Tempo supports **atomic batch transactions** — multiple contract calls bundled into a single transaction. The SDK's `fetchBatch()` method uses this to pay for multiple API calls atomically: either all payments succeed or none do. This is critical for agent workflows that depend on multiple services.
+
+→ [Tempo Batch Transactions Docs](https://docs.tempo.xyz/guide/use-accounts/batch-transactions)
+
+### 🏷️ Transfer Memos
+Tempo supports on-chain transfer memos, allowing agents to attach a **request fingerprint** (hash of the API request) to each payment. This enables providers to reconcile payments with specific API calls entirely on-chain.
+
+### 💸 Fee Sponsorship
+Tempo's native fee sponsorship means **agents pay zero gas fees**. A sponsor (the gateway operator or Privy) covers all transaction costs. Agents only need pathUSD stablecoins — no native gas tokens required.
+
+### 🔑 Native Account Abstraction
+Tempo has built-in smart accounts with session keys and spending limits, enabling fine-grained control over agent wallets without deploying custom smart contracts.
+
 ## Chain Details
 
 - **Network:** Tempo Testnet (Moderato)

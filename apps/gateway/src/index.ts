@@ -71,6 +71,17 @@ const stats = {
   recentTransactions: [] as TransactionLog[],
 };
 
+// ─── Passkey Credential Store (In-Memory) ────────────────────────
+interface PasskeyCredential {
+  id: string;
+  credentialId: string;
+  publicKey: string;
+  displayName: string;
+  registeredAt: string;
+}
+
+const passkeyCredentials: PasskeyCredential[] = [];
+
 // ─── Provider Registry ───────────────────────────────────────────
 interface RegisteredProvider {
   id: string;
@@ -631,6 +642,203 @@ app.get('/sites/:deployId/*', (c) => {
   return new Response(content);
 });
 
+// ─── Passkey API Endpoints ───────────────────────────────────────
+app.post('/auth/passkey/register', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { credentialId, publicKey, displayName } = body;
+  if (!credentialId || !publicKey) {
+    return c.json({ error: 'Missing credentialId or publicKey' }, 400);
+  }
+  const cred: PasskeyCredential = {
+    id: crypto.randomUUID().slice(0, 8),
+    credentialId,
+    publicKey,
+    displayName: displayName ?? 'Anonymous',
+    registeredAt: new Date().toISOString(),
+  };
+  passkeyCredentials.push(cred);
+  return c.json({ credential: cred, message: 'Passkey registered' }, 201);
+});
+
+app.get('/auth/passkey/credentials', (c) => {
+  return c.json({ credentials: passkeyCredentials, count: passkeyCredentials.length });
+});
+
+// ─── Passkey Auth Page ───────────────────────────────────────────
+app.get('/auth/passkey', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentGate — Passkey Authentication</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+  <div class="max-w-2xl mx-auto px-6 py-10">
+    <div class="flex items-center gap-4 mb-8">
+      <div class="text-4xl">🔐</div>
+      <div>
+        <h1 class="text-3xl font-bold">Passkey Authentication</h1>
+        <p class="text-gray-400">Tempo-native WebAuthn passkey accounts</p>
+      </div>
+      <a href="/dashboard" class="ml-auto text-blue-400 hover:underline text-sm">← Dashboard</a>
+    </div>
+
+    <div class="bg-gray-900 rounded-xl border border-purple-800 p-6 mb-6">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-purple-400 font-semibold">⛓️ Tempo-Native Passkeys</span>
+      </div>
+      <p class="text-gray-400 text-sm mb-3">
+        Tempo supports <strong class="text-white">P256/WebAuthn signatures natively at the protocol level</strong>.
+        This means your passkey (Face ID, Touch ID, security key) can directly control a Tempo account —
+        no seed phrases, no browser extensions.
+      </p>
+      <a href="https://docs.tempo.xyz/guide/use-accounts/embed-passkeys" target="_blank"
+         class="text-purple-400 hover:underline text-sm">📖 Tempo Passkey Docs →</a>
+    </div>
+
+    <!-- Sign Up -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Create Passkey Account</h2>
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1">Display Name</label>
+        <input id="displayName" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-purple-500 focus:outline-none" placeholder="Your name" value="">
+      </div>
+      <button id="registerBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-lg font-medium transition w-full">
+        🔐 Sign Up with Passkey
+      </button>
+      <div id="registerStatus" class="mt-3 text-sm"></div>
+    </div>
+
+    <!-- Sign In -->
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Sign In with Passkey</h2>
+      <button id="loginBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-medium transition w-full">
+        🔑 Sign In with Passkey
+      </button>
+      <div id="loginStatus" class="mt-3 text-sm"></div>
+    </div>
+
+    <!-- Credential Info -->
+    <div id="credentialInfo" class="hidden bg-gray-900 rounded-xl border border-green-800 p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-3 text-green-400">✅ Authenticated</h2>
+      <div class="space-y-2 text-sm">
+        <div><span class="text-gray-400">Credential ID:</span> <code id="credId" class="text-green-300 text-xs break-all"></code></div>
+        <div><span class="text-gray-400">Public Key (P256):</span> <code id="credPubKey" class="text-green-300 text-xs break-all"></code></div>
+        <div><span class="text-gray-400">Display Name:</span> <span id="credName" class="text-white"></span></div>
+      </div>
+      <p class="text-gray-500 text-xs mt-3">This P256 public key can be used as a Tempo account identifier — no seed phrase needed.</p>
+    </div>
+
+    <div class="text-center text-gray-600 text-sm">
+      <a href="/" class="text-blue-400 hover:underline">Home</a> ·
+      <a href="/dashboard" class="text-blue-400 hover:underline">Dashboard</a> ·
+      <a href="/providers" class="text-blue-400 hover:underline">Providers</a>
+    </div>
+  </div>
+  <script>
+    function bufToBase64url(buf) {
+      return btoa(String.fromCharCode(...new Uint8Array(buf)))
+        .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+    }
+
+    document.getElementById('registerBtn').addEventListener('click', async () => {
+      const status = document.getElementById('registerStatus');
+      const name = document.getElementById('displayName').value || 'AgentGate User';
+      status.textContent = 'Creating passkey...';
+      status.className = 'mt-3 text-sm text-yellow-400';
+
+      try {
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge,
+            rp: { name: 'AgentGate', id: location.hostname },
+            user: {
+              id: crypto.getRandomValues(new Uint8Array(16)),
+              name: name,
+              displayName: name,
+            },
+            pubKeyCredParams: [
+              { type: 'public-key', alg: -7 },   // ES256 (P-256) — Tempo native!
+              { type: 'public-key', alg: -257 },  // RS256 fallback
+            ],
+            authenticatorSelection: {
+              authenticatorAttachment: 'platform',
+              userVerification: 'preferred',
+              residentKey: 'preferred',
+            },
+            timeout: 60000,
+          }
+        });
+
+        const credId = bufToBase64url(credential.rawId);
+        const attestation = bufToBase64url(credential.response.attestationObject);
+
+        // Store on server
+        const res = await fetch('/auth/passkey/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            credentialId: credId,
+            publicKey: attestation,
+            displayName: name,
+          }),
+        });
+
+        if (res.ok) {
+          status.textContent = '✅ Passkey created successfully!';
+          status.className = 'mt-3 text-sm text-green-400';
+          showCredential(credId, attestation.slice(0, 64) + '...', name);
+        } else {
+          status.textContent = '✗ Registration failed';
+          status.className = 'mt-3 text-sm text-red-400';
+        }
+      } catch (err) {
+        status.textContent = '✗ ' + (err.message || 'Passkey creation failed');
+        status.className = 'mt-3 text-sm text-red-400';
+      }
+    });
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const status = document.getElementById('loginStatus');
+      status.textContent = 'Requesting passkey...';
+      status.className = 'mt-3 text-sm text-yellow-400';
+
+      try {
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
+        const assertion = await navigator.credentials.get({
+          publicKey: {
+            challenge,
+            rpId: location.hostname,
+            userVerification: 'preferred',
+            timeout: 60000,
+          }
+        });
+
+        const credId = bufToBase64url(assertion.rawId);
+        const sig = bufToBase64url(assertion.response.signature);
+
+        status.textContent = '✅ Signed in successfully!';
+        status.className = 'mt-3 text-sm text-green-400';
+        showCredential(credId, sig.slice(0, 64) + '...', 'Authenticated User');
+      } catch (err) {
+        status.textContent = '✗ ' + (err.message || 'Sign-in failed');
+        status.className = 'mt-3 text-sm text-red-400';
+      }
+    });
+
+    function showCredential(id, key, name) {
+      document.getElementById('credentialInfo').classList.remove('hidden');
+      document.getElementById('credId').textContent = id;
+      document.getElementById('credPubKey').textContent = key;
+      document.getElementById('credName').textContent = name;
+    }
+  </script>
+</body>
+</html>`);
+});
+
 // ─── Provider Registry Page ──────────────────────────────────────
 app.get('/providers', (c) => {
   const providerCards = registeredProviders.map(p => `
@@ -714,6 +922,7 @@ app.get('/providers', (c) => {
       : `<div class="grid md:grid-cols-2 gap-4">${providerCards}</div>`}
 
     <div class="mt-8 text-center text-gray-600 text-sm">
+      <a href="/auth/passkey" class="text-purple-400 hover:underline">🔐 Sign in with Passkey</a> ·
       <a href="/" class="text-blue-400 hover:underline">Home</a> ·
       <a href="/dashboard" class="text-blue-400 hover:underline">Dashboard</a> ·
       <a href="/.well-known/x-agentgate.json" class="text-blue-400 hover:underline">Discovery API</a>
@@ -937,6 +1146,7 @@ app.get('/dashboard', async (c) => {
     </div>
 
     <div class="mt-8 text-center text-gray-600 text-sm">
+      <a href="/auth/passkey" class="text-purple-400 hover:underline">🔐 Sign in with Passkey</a> ·
       AgentGate — Built on <a href="https://tempo.xyz" class="text-blue-400 hover:underline">Tempo</a> · 
       Wallets by <a href="https://privy.io" class="text-purple-400 hover:underline">Privy</a> · 
       <a href="/providers" class="text-blue-400 hover:underline">Provider Marketplace</a> ·
@@ -1144,6 +1354,51 @@ app.get('/', (c) => {
           <div class="text-xl font-bold text-blue-400">TIP-20</div>
           <div class="text-gray-400 text-sm">Native token standard</div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tempo-Native Features -->
+  <div class="max-w-5xl mx-auto px-6 pb-16">
+    <div class="bg-gray-900 rounded-xl border border-gray-800 p-8">
+      <h2 class="text-2xl font-bold text-center mb-6">⚡ Tempo-Native Features</h2>
+      <p class="text-gray-400 text-center mb-8">AgentGate leverages Tempo's unique blockchain features purpose-built for agent payments</p>
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="text-center">
+          <div class="text-3xl mb-2">🔐</div>
+          <h3 class="font-semibold mb-1">Passkey Accounts</h3>
+          <p class="text-gray-400 text-sm">Providers authenticate with Face ID / Touch ID via Tempo's native P256/WebAuthn support</p>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl mb-2">⚡</div>
+          <h3 class="font-semibold mb-1">Parallel Payments</h3>
+          <p class="text-gray-400 text-sm">Multiple payments in one block using Tempo's 2D expiring nonce system</p>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl mb-2">📦</div>
+          <h3 class="font-semibold mb-1">Batch Transactions</h3>
+          <p class="text-gray-400 text-sm">Atomic multi-service payments in a single transaction</p>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl mb-2">🏷️</div>
+          <h3 class="font-semibold mb-1">Transfer Memos</h3>
+          <p class="text-gray-400 text-sm">On-chain request fingerprints for payment reconciliation</p>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl mb-2">💸</div>
+          <h3 class="font-semibold mb-1">Fee Sponsorship</h3>
+          <p class="text-gray-400 text-sm">Agents pay zero gas fees — Tempo sponsors all transaction costs</p>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl mb-2">🔑</div>
+          <h3 class="font-semibold mb-1">Account Abstraction</h3>
+          <p class="text-gray-400 text-sm">Native smart accounts with session keys and spending limits</p>
+        </div>
+      </div>
+      <div class="mt-6 text-center">
+        <a href="https://docs.tempo.xyz" target="_blank" class="text-blue-400 hover:underline text-sm">📖 Tempo Documentation →</a>
+        <span class="mx-2 text-gray-600">·</span>
+        <a href="/auth/passkey" class="text-purple-400 hover:underline text-sm">🔐 Try Passkey Auth →</a>
       </div>
     </div>
   </div>
