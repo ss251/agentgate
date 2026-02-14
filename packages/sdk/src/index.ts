@@ -2,49 +2,26 @@ import {
   createWalletClient,
   createPublicClient,
   http,
+  encodeFunctionData,
   type Address,
   type Hex,
   type Chain,
   type Account,
-  encodeFunctionData,
-  parseUnits,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { tempoTestnet, ERC20_ABI, STABLECOINS, type StablecoinSymbol } from '@agentgate/core';
 
 export interface AgentWalletConfig {
-  /** Agent's private key (for hackathon; use Privy server wallets in production) */
   privateKey: Hex;
-  /** Chain (default: Tempo testnet) */
   chain?: Chain;
-  /** Custom RPC URL */
   rpcUrl?: string;
-}
-
-export interface PaymentResponse {
-  payment: {
-    recipientAddress: Address;
-    tokenAddress: Address;
-    tokenSymbol: string;
-    amountRequired: string;
-    amountHuman: string;
-    chainId: number;
-    [key: string]: any;
-  };
 }
 
 /**
  * AgentGate SDK — wraps fetch with automatic 402 payment handling.
- * 
- * Usage:
- *   const agent = new AgentGateClient({ privateKey: '0x...' });
- *   const result = await agent.fetch('https://api.example.com/chat', {
- *     method: 'POST',
- *     body: JSON.stringify({ prompt: 'Hello' }),
- *   });
  */
 export class AgentGateClient {
-  private account: Account;
+  private account: ReturnType<typeof privateKeyToAccount>;
   private chain: Chain;
   private rpcUrl?: string;
 
@@ -60,13 +37,8 @@ export class AgentGateClient {
 
   /**
    * Fetch with automatic 402 → pay → retry.
-   * If the server returns 402, the SDK:
-   *   1. Parses payment requirements
-   *   2. Sends TIP-20 transfer on-chain
-   *   3. Retries with X-Payment header
    */
   async fetch(url: string, init?: RequestInit): Promise<Response> {
-    // First attempt
     const response = await fetch(url, init);
 
     if (response.status !== 402) {
@@ -74,12 +46,14 @@ export class AgentGateClient {
     }
 
     // Parse 402 response
-    const body: PaymentResponse = await response.json();
-    const { payment } = body;
+    const body = await response.json();
+    const payment = body.payment;
 
     if (!payment?.recipientAddress || !payment?.amountRequired || !payment?.tokenAddress) {
       throw new Error('Invalid 402 response: missing payment requirements');
     }
+
+    console.log(`[AgentGate] 💰 Payment required: ${payment.amountHuman} ${payment.tokenSymbol}`);
 
     // Send payment on-chain
     const txHash = await this.sendPayment({
@@ -88,19 +62,21 @@ export class AgentGateClient {
       amount: BigInt(payment.amountRequired),
     });
 
+    console.log(`[AgentGate] ✅ Payment sent: ${txHash}`);
+
     // Retry with payment header
     const retryHeaders = new Headers(init?.headers);
     retryHeaders.set('X-Payment', `${txHash}:${this.chain.id}`);
 
-    return fetch(url, {
+    const retryResponse = await fetch(url, {
       ...init,
       headers: retryHeaders,
     });
+
+    console.log(`[AgentGate] 📦 Response: ${retryResponse.status}`);
+    return retryResponse;
   }
 
-  /**
-   * Send a TIP-20 (ERC-20) transfer on Tempo.
-   */
   async sendPayment(params: {
     to: Address;
     tokenAddress: Address;
@@ -123,39 +99,29 @@ export class AgentGateClient {
       data,
     });
 
-    // Wait for confirmation (Tempo has instant finality)
     const publicClient = createPublicClient({
       chain: this.chain,
       transport: http(this.rpcUrl),
     });
 
     await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
-
     return hash;
   }
 
-  /**
-   * Check balance of a stablecoin.
-   */
   async getBalance(token: StablecoinSymbol = 'pathUSD'): Promise<bigint> {
     const publicClient = createPublicClient({
       chain: this.chain,
       transport: http(this.rpcUrl),
     });
 
-    const balance = await publicClient.readContract({
+    return await publicClient.readContract({
       address: STABLECOINS[token].address,
       abi: ERC20_ABI,
       functionName: 'balanceOf',
       args: [this.account.address],
-    });
-
-    return balance as bigint;
+    }) as bigint;
   }
 
-  /**
-   * Discover AgentGate-enabled endpoints from a host.
-   */
   async discover(baseUrl: string): Promise<any> {
     const res = await fetch(`${baseUrl}/.well-known/x-agentgate.json`);
     if (!res.ok) throw new Error(`Discovery failed: ${res.status}`);

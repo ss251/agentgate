@@ -1,7 +1,18 @@
 {
   "name": "@agentgate/core",
   "version": "0.1.0",
+  "description": "Core types, chain definitions, token addresses, and payment verification for AgentGate — the HTTP 402 payment protocol for AI agents on Tempo",
   "type": "module",
   "main": "src/index.ts",
-  "types": "src/index.ts"
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src"],
+  "keywords": ["agentgate", "tempo", "tip-20", "402", "payment", "ai-agent", "blockchain"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thescoho/agentgate"
+  }
 }

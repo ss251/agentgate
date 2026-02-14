@@ -1,10 +1,11 @@
 import { createMiddleware } from 'hono/factory';
-import type { Context, MiddlewareHandler } from 'hono';
+import type { MiddlewareHandler } from 'hono';
 import type { Address, Hex, Chain } from 'viem';
+import { parseUnits } from 'viem';
 import {
   verifyPayment,
-  parsePaymentHeader,
   buildPaymentRequirement,
+  STABLECOINS,
   type StablecoinSymbol,
   type PaymentRequirement,
   tempoTestnet,
@@ -16,33 +17,16 @@ export interface EndpointPricing {
 }
 
 export interface PaywallOptions {
-  /** Provider's wallet address — where payments go */
   recipientAddress: Address;
-  /** Which stablecoin to accept (default: pathUSD) */
   token?: StablecoinSymbol;
-  /** Pricing per "METHOD /path" */
   pricing: Record<string, EndpointPricing>;
-  /** Payment validity window in seconds (default: 300 = 5 min) */
   expirySeconds?: number;
-  /** Chain config (default: Tempo testnet) */
   chain?: Chain;
-  /** Custom RPC URL */
   rpcUrl?: string;
-  /** Set of already-used tx hashes to prevent replay (in-memory default) */
   usedTxHashes?: Set<string>;
-  /** Called after successful payment verification */
   onPayment?: (info: { from: Address; amount: bigint; txHash: Hex; endpoint: string }) => void | Promise<void>;
 }
 
-/**
- * Hono middleware: paywall()
- * 
- * Returns 402 with payment requirements if no valid payment header.
- * Verifies on-chain TIP-20 transfer if X-Payment header is present.
- * 
- * Usage:
- *   app.use('/api/*', paywall({ recipientAddress: '0x...', pricing: { 'POST /api/chat': { amount: '0.01' } } }));
- */
 export function paywall(options: PaywallOptions): MiddlewareHandler {
   const {
     recipientAddress,
@@ -55,15 +39,15 @@ export function paywall(options: PaywallOptions): MiddlewareHandler {
     onPayment,
   } = options;
 
+  const tokenInfo = STABLECOINS[token];
+
   return createMiddleware(async (c, next) => {
     const method = c.req.method;
     const path = new URL(c.req.url).pathname;
     const key = `${method} ${path}`;
 
-    // Check if this endpoint has pricing
     const price = pricing[key];
     if (!price) {
-      // No pricing = free endpoint
       return next();
     }
 
@@ -102,35 +86,41 @@ export function paywall(options: PaywallOptions): MiddlewareHandler {
       );
     }
 
-    // Parse and verify payment
-    const parsed = parsePaymentHeader(paymentHeader);
-    if (!parsed) {
+    // Parse payment header (format: txHash:chainId)
+    const colonIdx = paymentHeader.lastIndexOf(':');
+    if (colonIdx === -1) {
       return c.json({ error: 'Invalid X-Payment header format. Expected: txHash:chainId' }, 400);
+    }
+    const txHash = paymentHeader.slice(0, colonIdx) as Hex;
+    const paymentChainId = parseInt(paymentHeader.slice(colonIdx + 1), 10);
+
+    if (!txHash.startsWith('0x') || isNaN(paymentChainId)) {
+      return c.json({ error: 'Invalid X-Payment header format' }, 400);
     }
 
     // Replay protection
-    if (usedTxHashes.has(parsed.txHash)) {
+    if (usedTxHashes.has(txHash)) {
       return c.json({ error: 'Transaction already used for a previous request' }, 409);
     }
 
     // Build requirement for verification
-    // Note: in production, nonce/expiry should come from a server-side store
-    // For hackathon, we verify the transfer amount and recipient only
+    const amountRequired = parseUnits(price.amount, tokenInfo.decimals).toString();
+
     const requirement: PaymentRequirement = {
       recipientAddress,
-      tokenAddress: (await import('@agentgate/core')).STABLECOINS[token].address,
+      tokenAddress: tokenInfo.address,
       tokenSymbol: token,
-      amountRequired: (await import('viem')).parseUnits(price.amount, 18).toString(),
+      amountRequired,
       amountHuman: price.amount,
       endpoint: key,
-      nonce: '', // not checked in verify for now
-      expiry: Math.floor(Date.now() / 1000) + expirySeconds, // generous window
+      nonce: '',
+      expiry: Math.floor(Date.now() / 1000) + expirySeconds,
       chainId: chain.id,
-      memo: '0x' as Hex,
+      memo: '0x0000000000000000000000000000000000000000000000000000000000000000' as Hex,
     };
 
     const verification = await verifyPayment({
-      txHash: parsed.txHash,
+      txHash,
       requirement,
       chain,
       rpcUrl,
@@ -141,19 +131,17 @@ export function paywall(options: PaywallOptions): MiddlewareHandler {
     }
 
     // Mark tx as used
-    usedTxHashes.add(parsed.txHash);
+    usedTxHashes.add(txHash);
 
-    // Callback
     if (onPayment && verification.from) {
       await onPayment({
         from: verification.from,
         amount: verification.amount!,
-        txHash: parsed.txHash,
+        txHash,
         endpoint: key,
       });
     }
 
-    // Attach payment info to context
     c.set('payment' as any, verification);
 
     return next();

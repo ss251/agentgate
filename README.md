@@ -1,30 +1,65 @@
 # AgentGate 🚪💰
 
-**Pay-per-call API access for AI agents on Tempo blockchain.**
+**HTTP 402 Payment Protocol for AI Agents on Tempo**
 
-AgentGate is a TypeScript toolkit that lets AI agents pay for API endpoints using stablecoins on [Tempo](https://tempo.xyz). Service providers add a single middleware to monetize their APIs. Agents auto-pay using the HTTP 402 protocol.
+AgentGate enables AI agents to discover and pay for API services using on-chain TIP-20 stablecoin transfers. When an agent hits a paid endpoint, it gets a `402 Payment Required` response, sends a pathUSD transfer on Tempo, and retries with the tx hash.
 
 ## How It Works
 
 ```
-Agent → GET /api/chat → 402 Payment Required (price: 0.01 pathUSD)
-Agent → Sends 0.01 pathUSD on Tempo (instant, ~0 fees)
-Agent → GET /api/chat + X-Payment: <txHash>:42431 → 200 OK ✅
+Agent                    Gateway                  Tempo Chain
+  |                        |                          |
+  |-- POST /api/execute -->|                          |
+  |<-- 402 + payment req --|                          |
+  |                        |                          |
+  |-- transfer pathUSD ----|------------------------->|
+  |<-- tx confirmed -------|--------------------------|
+  |                        |                          |
+  |-- POST /api/execute -->|                          |
+  |   (X-Payment: tx:chain)|-- verify on-chain ------>|
+  |<-- 200 + result -------|                          |
 ```
-
-No accounts. No API keys. No subscriptions. Just HTTP + blockchain.
-
-## Packages
-
-| Package | Description |
-|---------|------------|
-| `@agentgate/core` | Chain definitions, token addresses, payment verification, utilities |
-| `@agentgate/middleware` | Hono `paywall()` middleware — one line to monetize any endpoint |
-| `@agentgate/sdk` | Agent client SDK — auto 402→pay→retry flow |
 
 ## Quick Start
 
-### Provider (monetize your API)
+```bash
+bun install
+bun run apps/gateway/src/index.ts
+# Gateway runs on http://localhost:3402
+```
+
+## Services
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| `POST /api/execute` | 0.01 pathUSD | Run TypeScript, Python, or shell code |
+| `POST /api/scrape` | 0.005 pathUSD | Fetch and extract content from URLs |
+| `POST /api/deploy` | 0.05 pathUSD | Deploy HTML and get a live URL |
+
+## SDK Usage (Agent Side)
+
+```typescript
+import { AgentGateClient } from '@agentgate/sdk';
+
+const agent = new AgentGateClient({
+  privateKey: '0x...',  // Agent's private key (funded with pathUSD)
+});
+
+// Discover available services
+const services = await agent.discover('http://localhost:3402');
+
+// Call a paid endpoint — payment is automatic!
+const res = await agent.fetch('http://localhost:3402/api/execute', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ code: 'console.log(2 + 2)', language: 'typescript' }),
+});
+
+const data = await res.json();
+// { stdout: "4\n", stderr: "", exitCode: 0, executionTimeMs: 42 }
+```
+
+## Middleware Usage (Provider Side)
 
 ```typescript
 import { Hono } from 'hono';
@@ -33,83 +68,47 @@ import { paywall } from '@agentgate/middleware';
 const app = new Hono();
 
 app.use('/api/*', paywall({
-  recipientAddress: '0xYourWallet',
+  recipientAddress: '0x...', // Your wallet
+  token: 'pathUSD',
   pricing: {
-    'POST /api/chat': { amount: '0.01', description: 'LLM Chat' },
-    'GET /api/weather': { amount: '0.001', description: 'Weather Data' },
+    'POST /api/myservice': { amount: '0.01', description: 'My Service' },
   },
 }));
 
-app.post('/api/chat', (c) => c.json({ response: 'Hello from a paid API!' }));
+app.post('/api/myservice', (c) => c.json({ result: 'paid content' }));
 ```
 
-### Agent (pay for APIs automatically)
+## Service Discovery
 
-```typescript
-import { AgentGateClient } from '@agentgate/sdk';
-
-const agent = new AgentGateClient({ privateKey: '0x...' });
-
-// Automatic: detects 402 → pays on Tempo → retries → returns result
-const res = await agent.fetch('https://api.example.com/api/chat', {
-  method: 'POST',
-  body: JSON.stringify({ prompt: 'Hello' }),
-});
-const data = await res.json();
+```bash
+curl http://localhost:3402/.well-known/x-agentgate.json
 ```
-
-### Service Discovery
-
-Providers expose `/.well-known/x-agentgate.json`:
-
-```json
-{
-  "name": "My API",
-  "chain": { "id": 42431, "name": "Tempo Testnet" },
-  "token": { "symbol": "pathUSD", "address": "0x20c0..." },
-  "endpoints": [
-    { "method": "POST", "path": "/api/chat", "price": "0.01" }
-  ]
-}
-```
-
-Agents can crawl this to discover and auto-pay for services.
-
-## Why Tempo?
-
-- **Instant finality** — payment verification in the same HTTP request
-- **Stablecoin-native** — no volatile gas tokens, pay fees in USD stablecoins
-- **Fee sponsorship** — platforms can sponsor agent gas fees for zero-friction onboarding
-- **Transfer memos** — tie every payment to a specific API call on-chain
 
 ## Architecture
 
 ```
-┌──────────┐   1. Request    ┌────────────────┐
-│ AI Agent │ ───────────────► │  Provider API  │
-│  (SDK)   │ ◄─── 2. 402 ─── │  (+ paywall)   │
-│          │                  └────────────────┘
-│          │   3. Pay pathUSD        │
-│          │ ──────────────► ┌──────────────┐
-│          │                 │    Tempo      │
-│          │ ◄── 4. tx hash  │  Blockchain   │
-│          │                 └──────────────┘
-│          │   5. Retry + X-Payment
-│          │ ───────────────► ┌────────────────┐
-│          │ ◄─── 6. 200 ─── │  Provider API  │
-└──────────┘    (verified!)   └────────────────┘
+packages/
+  core/        — Chain defs, token addresses, payment verification, types
+  middleware/  — Hono paywall() middleware (returns 402, verifies payments)
+  sdk/         — AgentGateClient with auto 402→pay→retry
+apps/
+  gateway/     — Demo gateway with real services (execute, scrape, deploy)
 ```
 
-## Development
+## Chain Details
+
+- **Network:** Tempo Testnet (Moderato)
+- **Chain ID:** 42431
+- **RPC:** https://rpc.moderato.tempo.xyz
+- **Token:** pathUSD (6 decimals) at `0x20c0000000000000000000000000000000000000`
+
+## Testing
 
 ```bash
-bun install
-bun run apps/gateway/src/index.ts   # Start demo gateway on :3402
+bun test
 ```
 
-## Built for
-
-🏆 **Canteen x Tempo Hackathon** — Track 3: AI Agents & Automation
+Tests run against Tempo testnet with real on-chain payments.
 
 ## License
 
