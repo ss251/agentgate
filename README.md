@@ -123,6 +123,28 @@ bun run apps/gateway/src/index.ts
 
 **Free endpoints:** `/`, `/dashboard`, `/providers`, `/api/health`, `/api/sites`, `/api/providers`, `/.well-known/x-agentgate.json`
 
+## MCP Server (Claude Desktop / Cursor / Windsurf)
+
+Use AgentGate from any MCP-compatible AI tool — payments happen automatically on-chain.
+
+```json
+{
+  "mcpServers": {
+    "agentgate": {
+      "command": "bunx",
+      "args": ["@tempo-agentgate/mcp"],
+      "env": {
+        "AGENTGATE_PRIVATE_KEY": "0xYOUR_PRIVATE_KEY_HERE"
+      }
+    }
+  }
+}
+```
+
+**Tools available:** `execute_code`, `scrape_url`, `agent_chat`, `deploy_site`, `discover_services`, `check_balance`
+
+See [`packages/mcp/README.md`](./packages/mcp/README.md) for full setup instructions.
+
 ## SDK Usage (Agent Side)
 
 ```typescript
