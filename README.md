@@ -11,6 +11,21 @@ AgentGate is a pay-per-call API marketplace where **providers** monetize their A
 
 > **🏪 Bring Your Own Backend** — Any API provider can add `paywall()` middleware to their Hono app and start earning pathUSD from AI agents. LLM inference, data APIs, compute services — if you serve HTTP, you can earn crypto.
 
+### 🔗 Key Links
+
+| | |
+|---|---|
+| **🌐 Live Gateway** | [tempo-agentgategateway-production.up.railway.app](https://tempo-agentgategateway-production.up.railway.app) |
+| **📊 Dashboard** | [Dashboard](https://tempo-agentgategateway-production.up.railway.app/dashboard) — real-time stats, 197+ on-chain transactions |
+| **🏪 Provider Marketplace** | [Providers](https://tempo-agentgategateway-production.up.railway.app/providers) — register your API |
+| **🔍 Service Discovery** | [discovery.json](https://tempo-agentgategateway-production.up.railway.app/.well-known/x-agentgate.json) \| [A2A Agent Card](https://tempo-agentgategateway-production.up.railway.app/.well-known/agent.json) |
+| **📦 npm: SDK** | [@tempo-agentgate/sdk](https://www.npmjs.com/package/@tempo-agentgate/sdk) — agent client with auto 402→pay→retry |
+| **📦 npm: Middleware** | [@tempo-agentgate/middleware](https://www.npmjs.com/package/@tempo-agentgate/middleware) — one-line `paywall()` for Hono |
+| **📦 npm: Core** | [@tempo-agentgate/core](https://www.npmjs.com/package/@tempo-agentgate/core) — shared types, chain config, verification |
+| **📦 npm: MCP Server** | [@tempo-agentgate/mcp](https://www.npmjs.com/package/@tempo-agentgate/mcp) — Claude Desktop / Cursor / Windsurf integration |
+| **⛓️ On-chain Activity** | [Provider Wallet on Tempo Explorer](https://explore.tempo.xyz/address/0x00DfEe79B7fd7aEF0312E06da8E1d60a5957F9Cf) — 197 transactions |
+| **🎬 Demo Video** | [Watch](https://github.com/ss251/agentgate/releases/download/v0.1.0/agentgate-demo.mp4) |
+
 ## Why AgentGate?
 
 AI agents need to consume APIs — LLM inference, code execution, web scraping, and more. But how do they *pay* for these services? And how do providers *monetize* them for autonomous agents?
